@@ -1,18 +1,16 @@
 name: Deploy to Cloud Run
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'services/orchestrator/**'
-      - 'infra/cloudrun.yaml'
+# Manual-only to avoid failing runs before secrets are set
+on: { workflow_dispatch: {} }
 
 env:
   SERVICE_NAME: orchestrator
   REGION: us-central1
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   GAR_REPO: ${{ secrets.GAR_REPO || 'orchestrator' }}
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
