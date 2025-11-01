@@ -36,18 +36,18 @@ jobs:
         id: detect_node
         run: |
           if [ -f package.json ]; then
-            echo 'present=true' >> $GITHUB_OUTPUT;
+            echo 'present=true' >> $GITHUB_OUTPUT
           else
-            echo 'present=false' >> $GITHUB_OUTPUT;
+            echo 'present=false' >> $GITHUB_OUTPUT
           fi
       - name: Install deps
         if: steps.detect_node.outputs.present == 'true'
         shell: bash
         run: |
           if [ -f package-lock.json ]; then
-            npm ci --no-audit --fund=false;
+            npm ci --no-audit --fund=false
           else
-            npm i --no-audit --fund=false;
+            npm i --no-audit --fund=false
           fi
       - name: Sanity check entrypoint exists
         if: steps.detect_node.outputs.present == 'true'
@@ -61,9 +61,9 @@ jobs:
         id: detect_docker
         run: |
           if [ -f services/orchestrator/Dockerfile ]; then
-            echo 'present=true' >> $GITHUB_OUTPUT;
+            echo 'present=true' >> $GITHUB_OUTPUT
           else
-            echo 'present=false' >> $GITHUB_OUTPUT;
+            echo 'present=false' >> $GITHUB_OUTPUT
           fi
       - uses: docker/setup-qemu-action@v3
         if: steps.detect_docker.outputs.present == 'true'
