@@ -27,11 +27,7 @@ jobs:
         working-directory: services/orchestrator
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: services/orchestrator/package-lock.json
+
       - name: Detect orchestrator package
         id: detect_node
         run: |
@@ -40,6 +36,31 @@ jobs:
           else
             echo 'present=false' >> $GITHUB_OUTPUT
           fi
+
+      - name: Detect lockfile
+        if: steps.detect_node.outputs.present == 'true'
+        id: detect_lock
+        run: |
+          if [ -f package-lock.json ]; then
+            echo 'lock=true' >> $GITHUB_OUTPUT
+          else
+            echo 'lock=false' >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node (cached)
+        if: steps.detect_node.outputs.present == 'true' && steps.detect_lock.outputs.lock == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/orchestrator/package-lock.json
+
+      - name: Setup Node (no cache)
+        if: steps.detect_node.outputs.present == 'true' && steps.detect_lock.outputs.lock != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install deps
         if: steps.detect_node.outputs.present == 'true'
         shell: bash
@@ -49,6 +70,7 @@ jobs:
           else
             npm i --no-audit --fund=false
           fi
+
       - name: Sanity check entrypoint exists
         if: steps.detect_node.outputs.present == 'true'
         run: node -e "require('fs').accessSync('index.js')"
