@@ -1,80 +1,67 @@
 name: Deploy to Cloud Run
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
 
 env:
-  SERVICE_NAME: orchestrator
+  GCP_PROJECT_ID: ghost-engine-labs
   REGION: us-central1
-  # Repo settings → Secrets and variables → Actions:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  # Change if your Artifact Registry repo has a different name
-  GAR_REPO: orchestrator
-
-permissions:
-  contents: read
+  SERVICE: orchestrator
+  REPO: orchestrator  # Artifact Registry repo name
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: Verify required secrets exist
-        env:
-          REQ_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
-          REQ_KEY: ${{ secrets.GCP_SA_KEY }}
-        run: |
-          if [ -z "${REQ_PROJECT}" ] || [ -z "${REQ_KEY}" ]; then
-            echo "Missing required secrets. Set GCP_PROJECT_ID and GCP_SA_KEY in repo Settings → Secrets and variables → Actions."
-            exit 1
-          fi
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/checkout@v4
-
-      # Authenticate to Google Cloud (v2 uses a separate auth step)
-      - name: Authenticate to Google Cloud
+      # Authenticate to Google Cloud using Workload Identity Federation (OIDC)
+      - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+          service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
 
-      # Install gcloud SDK (no creds passed here on v2)
-      - name: Set up gcloud SDK
+      - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
 
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" -q
-
-      - name: Build and push image
+      - name: Configure Artifact Registry Docker
         run: |
-          set -euo pipefail
-          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPO}/${SERVICE_NAME}:${GITHUB_SHA}"
-          docker build -t "$IMAGE" services/orchestrator
-          docker push "$IMAGE"
-          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE }}:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker build -t "$IMAGE" .
+
+      - name: Push image
+        run: docker push "$IMAGE"
 
       - name: Deploy to Cloud Run
+        id: deploy
         run: |
-          set -euo pipefail
-          gcloud run deploy "$SERVICE_NAME" \
+          gcloud run deploy "${{ env.SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.REGION }}" \
             --image "$IMAGE" \
-            --region "$REGION" \
-            --platform managed \
             --allow-unauthenticated \
-            --port 8080
+            --set-env-vars "GIT_SHA=${{ github.sha }}"
+          URL="$(gcloud run services describe "${{ env.SERVICE }}" --region "${{ env.REGION }}" --format='value(status.url)')"
+          echo "SERVICE_URL=$URL" >> $GITHUB_ENV
+          echo "Service URL: $URL" >> $GITHUB_STEP_SUMMARY
 
-      - name: Print service URL
-        id: print-url
-        shell: bash
+      - name: Smoke test (root and /health)
         run: |
-          set -euo pipefail
-          URL="$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format='value(status.url)')"
-          echo "SERVICE_URL=$URL" >> "$GITHUB_ENV"
-          {
-            echo "### Cloud Run deployment"
-            echo ""
-            echo "* Service: ${SERVICE_NAME}"
-            echo "* Region:  ${REGION}"
-            echo "* URL:     ${URL}"
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          set -e
+          echo "Hitting $SERVICE_URL ..."
+          curl -fsS "$SERVICE_URL" >/dev/null
+          # /health may not exist on first run
+          curl -fsS "$SERVICE_URL/health" || echo "No /health yet (will add soon)."
