@@ -9,20 +9,25 @@ env:
   GCP_PROJECT_ID: ghost-engine-labs
   REGION: us-central1
   SERVICE: orchestrator
-  REPO: orchestrator  # Artifact Registry repo name
+  REPO: orchestrator  # Artifact Registry repo name (Docker)
 
 jobs:
   deploy:
+    name: Build & Deploy (orchestrator)
     runs-on: ubuntu-latest
-    environment: production
+    environment: production   # add approvers/gates in GitHub → Settings → Environments
     permissions:
       contents: read
-      id-token: write
+      id-token: write         # required for OIDC / Workload Identity Federation
+    concurrency:
+      group: deploy-${{ github.ref }}
+      cancel-in-progress: true
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Authenticate to Google Cloud using Workload Identity Federation (OIDC)
+      # Auth to Google Cloud via Workload Identity Federation (no JSON key)
       - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
@@ -31,10 +36,11 @@ jobs:
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Configure Artifact Registry Docker
-        run: |
-          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+      - name: Configure Artifact Registry Docker auth
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build image
         run: |
@@ -48,20 +54,36 @@ jobs:
       - name: Deploy to Cloud Run
         id: deploy
         run: |
+          set -euo pipefail
           gcloud run deploy "${{ env.SERVICE }}" \
             --project "${{ env.GCP_PROJECT_ID }}" \
-            --region "${{ env.REGION }}" \
-            --image "$IMAGE" \
+            --region  "${{ env.REGION }}" \
+            --image   "$IMAGE" \
             --allow-unauthenticated \
             --set-env-vars "GIT_SHA=${{ github.sha }}"
+
           URL="$(gcloud run services describe "${{ env.SERVICE }}" --region "${{ env.REGION }}" --format='value(status.url)')"
           echo "SERVICE_URL=$URL" >> $GITHUB_ENV
           echo "Service URL: $URL" >> $GITHUB_STEP_SUMMARY
+          echo "::notice title=Cloud Run URL::$URL"
+          printf "%s" "$URL" > service_url.txt
 
-      - name: Smoke test (root and /health)
+      - name: Upload Service URL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-url
+          path: service_url.txt
+
+      - name: Enforced smoke test (root and /health)
         run: |
-          set -e
-          echo "Hitting $SERVICE_URL ..."
-          curl -fsS "$SERVICE_URL" >/dev/null
-          # /health may not exist on first run
-          curl -fsS "$SERVICE_URL/health" || echo "No /health yet (will add soon)."
+          set -euo pipefail
+          echo "Testing $SERVICE_URL ..."
+          curl -fsS "$SERVICE_URL/" >/dev/null
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health")
+          echo "HEALTH: $code"
+          test "$code" -eq 200
+
+      - name: Show recent logs on failure
+        if: failure()
+        run: |
+          gcloud run services logs read "${{ env.SERVICE }}" --region "${{ env.REGION }}" --limit=100 || true
