@@ -1,14 +1,15 @@
 name: Deploy to Cloud Run
 
 on:
-  # manual only
   workflow_dispatch: {}
 
 env:
   SERVICE_NAME: orchestrator
   REGION: us-central1
+  # Repo settings → Secrets and variables → Actions:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GAR_REPO: ${{ secrets.GAR_REPO || 'orchestrator' }}
+  # Change if your Artifact Registry repo has a different name
+  GAR_REPO: orchestrator
 
 permissions:
   contents: read
@@ -16,34 +17,33 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Verify required secrets exist
         env:
           REQ_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
           REQ_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
-          if [ -z "$REQ_PROJECT" ] || [ -z "$REQ_KEY" ]; then
+          if [ -z "${REQ_PROJECT}" ] || [ -z "${REQ_KEY}" ]; then
             echo "Missing required secrets. Set GCP_PROJECT_ID and GCP_SA_KEY in repo Settings → Secrets and variables → Actions."
             exit 1
           fi
 
       - uses: actions/checkout@v4
 
-      # ✅ Authenticate first (v2 requires a separate auth step)
+      # Authenticate to Google Cloud (v2 uses a separate auth step)
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # ✅ Then install gcloud (no creds fields here on v2)
+      # Install gcloud SDK (no creds passed here on v2)
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev -q
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" -q
 
       - name: Build and push image
         run: |
@@ -64,7 +64,17 @@ jobs:
             --port 8080
 
       - name: Print service URL
+        id: print-url
+        shell: bash
         run: |
-          gcloud run services describe "$SERVICE_NAME" \
-            --region "$REGION" \
-            --format='value(status.url)'
+          set -euo pipefail
+          URL="$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format='value(status.url)')"
+          echo "SERVICE_URL=$URL" >> "$GITHUB_ENV"
+          {
+            echo "### Cloud Run deployment"
+            echo ""
+            echo "* Service: ${SERVICE_NAME}"
+            echo "* Region:  ${REGION}"
+            echo "* URL:     ${URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
