@@ -7,6 +7,11 @@ app.get('/healthz', (req, res) => {
   res.status(200).send('ok');
 });
 
+// Standard health endpoint used by CI and uptime checks
+app.get('/health', (_req, res) => {
+  res.status(200).send('ok');
+});
+
 app.get('/', (req, res) => {
   res.json({ service: 'ghost-orchestrator', status: 'ready' });
 });
