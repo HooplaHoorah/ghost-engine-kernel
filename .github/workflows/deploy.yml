@@ -33,7 +33,7 @@ jobs:
         with:
           workload_identity_provider: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
           service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
-          audience: //iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+          audience: https://iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
