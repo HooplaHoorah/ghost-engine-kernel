@@ -9,16 +9,16 @@ env:
   GCP_PROJECT_ID: ghost-engine-labs
   REGION: us-central1
   SERVICE: orchestrator
-  REPO: orchestrator  # Artifact Registry repo name (Docker)
+  REPO: orchestrator # Artifact Registry repo (Docker)
 
 jobs:
   deploy:
     name: Build & Deploy (orchestrator)
     runs-on: ubuntu-latest
-    environment: production   # add approvers/gates in GitHub → Settings → Environments
+    environment: production
     permissions:
       contents: read
-      id-token: write         # required for OIDC / Workload Identity Federation
+      id-token: write          # required for OIDC
     concurrency:
       group: deploy-${{ github.ref }}
       cancel-in-progress: true
@@ -27,12 +27,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Auth to Google Cloud via Workload Identity Federation (no JSON key)
+      # ---- Auth: Workload Identity Federation (OIDC) with pinned audience ----
       - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
           service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
+          audience: //iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
