@@ -50,8 +50,9 @@ jobs:
       - name: Scan changed files for footer strings
         run: |
           set -euo pipefail
-          git diff --name-only ${{ steps.range.outputs.base }}..${{ steps.range.outputs.head }} | \
-          xargs -I{} bash -c 'test -f "{}" && (grep -I -n -i -E -f .github/no_breadcrumbs_patterns.txt "{}" && exit 1 || true)' || {
-            echo "::error::File(s) contain disallowed generator phrases"
-            exit 1
-          }
+          CHANGED=$(git diff --name-only ${{ steps.range.outputs.base }}..${{ steps.range.outputs.head }} | \
+            grep -vE '^\.github/no_breadcrumbs_patterns\.txt$|^\.githooks/commit-msg$' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "$CHANGED" | xargs -I{} bash -c 'test -f "{}" && (grep -I -n -i -E -f .github/no_breadcrumbs_patterns.txt "{}" && exit 1 || true)'
+          fi
+
