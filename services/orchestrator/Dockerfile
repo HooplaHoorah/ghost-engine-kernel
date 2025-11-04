@@ -1,8 +1,21 @@
-FROM node:20-alpine
+FROM node:20-alpine AS base
 WORKDIR /app
-COPY package.json .
-RUN npm ci --omit=dev || npm install --omit=dev
-COPY index.js .
-ENV NODE_ENV=production PORT=8080
+
+FROM base AS deps
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+FROM base AS build
+COPY --from=deps /app/node_modules /app/node_modules
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS runtime
+ENV NODE_ENV=production
+ENV PORT=8080
+WORKDIR /app
+COPY --from=deps /app/node_modules /app/node_modules
+COPY --from=build /app/dist /app/dist
 EXPOSE 8080
-CMD ["node", "index.js"]
+USER node
+CMD ["node", "dist/index.js"]

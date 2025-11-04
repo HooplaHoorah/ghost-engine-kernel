@@ -1,10 +1,6 @@
-# keep the context lean; we only need the orchestrator code & manifests
+**/node_modules
+**/.env*
 .git
 .github
-**/node_modules
-npm-debug.log
-infra
-whitepaper
-*.md
 Dockerfile
-.DS_Store
+npm-debug.log*

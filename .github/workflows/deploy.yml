@@ -7,9 +7,11 @@ on:
 
 env:
   GCP_PROJECT_ID: ghost-engine-labs
-  REGION: us-central1
-  SERVICE: orchestrator
-  REPO: orchestrator   # Artifact Registry repo name (Docker)
+  GCP_REGION: us-central1
+  CLOUD_RUN_SERVICE: orchestrator
+  ARTIFACT_REPO: orchestrator
+  WORKLOAD_IDENTITY_PROVIDER: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+  AUDIENCE: https://iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
 
 jobs:
   deploy:
@@ -27,12 +29,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---- Auth: Workload Identity Federation (OIDC), no audience ----
       - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
+          audience: ${{ env.AUDIENCE }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -40,11 +42,11 @@ jobs:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Configure Artifact Registry Docker auth
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Build image
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE }}:${{ github.sha }}"
+          IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
           docker build -t "$IMAGE" .
 
@@ -55,35 +57,38 @@ jobs:
         id: deploy
         run: |
           set -euo pipefail
-          gcloud run deploy "${{ env.SERVICE }}" \
+          gcloud run deploy "${{ env.CLOUD_RUN_SERVICE }}" \
             --project "${{ env.GCP_PROJECT_ID }}" \
-            --region "${{ env.REGION }}" \
+            --region "${{ env.GCP_REGION }}" \
             --image "$IMAGE" \
             --allow-unauthenticated \
             --set-env-vars "GIT_SHA=${{ github.sha }}"
 
-          URL="$(gcloud run services describe "${{ env.SERVICE }}" --region "${{ env.REGION }}" --format='value(status.url)')"
-          echo "SERVICE_URL=$URL" >> $GITHUB_ENV
-          echo "Service URL: $URL" >> $GITHUB_STEP_SUMMARY
-          echo "::notice title=Cloud Run URL::$URL"
-          printf "%s" "$URL" > service_url.txt
+      - name: Get Service URL
+        id: url
+        run: |
+          echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE \
+            --region $GCP_REGION --format='value(status.url)')" >> $GITHUB_OUTPUT
 
-      - name: Upload Service URL artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: service-url
-          path: service_url.txt
-
-      - name: Enforced smoke test (root and /health)
+      - name: Smoke test
         run: |
           set -euo pipefail
-          echo "Testing $SERVICE_URL ..."
-          curl -fsS "$SERVICE_URL/" >/dev/null
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health")
-          echo "HEALTH: $code"
-          test "$code" -eq 200
+          ROOT_CODE=$(curl -fsS -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/")
+          HEALTH_CODE=$(curl -fsS -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/health")
+          echo "$ROOT_CODE" > root_status.txt
+          echo "$HEALTH_CODE" > health_status.txt
+          [ "$HEALTH_CODE" = "200" ] || (echo "::error::/health not 200 ($HEALTH_CODE)" && exit 1)
+
+      - name: Upload URL & status artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-run-smoke
+          path: |
+            root_status.txt
+            health_status.txt
+          if-no-files-found: error
 
       - name: Show recent logs on failure
         if: failure()
         run: |
-          gcloud run services logs read "${{ env.SERVICE }}" --region "${{ env.REGION }}" --limit=100 || true
+          gcloud run services logs read "${{ env.CLOUD_RUN_SERVICE }}" --region "${{ env.GCP_REGION }}" --limit=100 || true
