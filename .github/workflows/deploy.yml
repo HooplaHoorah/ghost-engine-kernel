@@ -9,7 +9,7 @@ env:
   GCP_PROJECT_ID: ghost-engine-labs
   REGION: us-central1
   SERVICE: orchestrator
-  REPO: orchestrator # Artifact Registry repo (Docker)
+  REPO: orchestrator   # Artifact Registry repo name (Docker)
 
 jobs:
   deploy:
@@ -18,7 +18,7 @@ jobs:
     environment: production
     permissions:
       contents: read
-      id-token: write          # required for OIDC
+      id-token: write      # required for OIDC / Workload Identity Federation
     concurrency:
       group: deploy-${{ github.ref }}
       cancel-in-progress: true
@@ -27,13 +27,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---- Auth: Workload Identity Federation (OIDC) with pinned audience ----
+      # ---- Auth: Workload Identity Federation (OIDC), no audience ----
       - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
           service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
-          audience: https://iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -58,8 +57,8 @@ jobs:
           set -euo pipefail
           gcloud run deploy "${{ env.SERVICE }}" \
             --project "${{ env.GCP_PROJECT_ID }}" \
-            --region  "${{ env.REGION }}" \
-            --image   "$IMAGE" \
+            --region "${{ env.REGION }}" \
+            --image "$IMAGE" \
             --allow-unauthenticated \
             --set-env-vars "GIT_SHA=${{ github.sha }}"
 
