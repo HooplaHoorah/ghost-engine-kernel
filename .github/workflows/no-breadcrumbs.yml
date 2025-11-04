@@ -1,0 +1,58 @@
+name: no-breadcrumbs
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine range
+        id: range
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+            echo "head=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "base=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
+            echo "head=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Scan PR title/body (if PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          jq -r '[.pull_request.title, .pull_request.body] | join("\n")' "$GITHUB_EVENT_PATH" > pr_text.txt
+          if grep -iE -n -f .github/no_breadcrumbs_patterns.txt pr_text.txt; then
+            echo "::error::PR title/body contains disallowed generator phrases"
+            exit 1
+          fi
+
+      - name: Scan commit messages
+        run: |
+          set -euo pipefail
+          git log --format='%h %s%n%b%n---' ${{ steps.range.outputs.base }}..${{ steps.range.outputs.head }} > commits.txt
+          if grep -iE -n -f .github/no_breadcrumbs_patterns.txt commits.txt; then
+            echo "::error::Commit messages contain disallowed generator phrases"
+            exit 1
+          fi
+
+      - name: Scan changed files for footer strings
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only ${{ steps.range.outputs.base }}..${{ steps.range.outputs.head }} | \
+            grep -vE '^\.github/no_breadcrumbs_patterns\.txt$|^\.githooks/commit-msg$' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "$CHANGED" | xargs -I{} bash -c 'test -f "{}" && (grep -I -n -i -E -f .github/no_breadcrumbs_patterns.txt "{}" && exit 1 || true)'
+          fi
+
