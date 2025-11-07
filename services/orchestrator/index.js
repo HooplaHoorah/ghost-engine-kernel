@@ -3,15 +3,31 @@ import express from 'express';
 const app = express();
 const port = process.env.PORT || 8080;
 
+// Parse JSON bodies (future-proofing for /tasks, etc.)
+app.use(express.json());
+
+// --- Agent toggle ---
+const AGENT_MODE = (process.env.AGENT_MODE || 'off').toLowerCase();
+
+// Health check (Cloud Run probe)
 app.get('/health', (_req, res) => {
-  res.status(200).send('ok');
+  res.status(200).json({ ok: true, service: 'ghost-orchestrator' });
 });
 
+// Root
 app.get('/', (_req, res) => {
   res.status(200).json({ service: 'ghost-orchestrator', status: 'ready' });
 });
 
+// Agent ping (404 when off, 200 when on)
+app.get('/agent/ping', (_req, res) => {
+  if (AGENT_MODE === 'on' || AGENT_MODE === 'true') {
+    return res.status(200).json({ ok: true, agent: 'on' });
+  }
+  return res.status(404).json({ ok: false, agent: 'off' });
+});
+
 // Cloud Run requires binding to 0.0.0.0:$PORT
 app.listen(port, '0.0.0.0', () => {
-  console.log(`orchestrator listening on ${port}`);
+  console.log(`orchestrator listening on ${port} (agent=${AGENT_MODE})`);
 });
