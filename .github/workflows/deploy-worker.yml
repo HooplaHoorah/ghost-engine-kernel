@@ -15,15 +15,22 @@ jobs:
           audience: https://iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
           service_account: ${{ vars.DEPLOYER_SA }}
 
-      - uses: google-github-actions/setup-gcloud@v2
-        with: { project_id: ghost-engine-labs }
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ghost-engine-labs
 
+      - name: Configure Artifact Registry Docker auth
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      # Build and push with Docker (no Cloud Build)
       - name: Build & push (worker)
         run: |
           set -euo pipefail
           IMAGE="us-central1-docker.pkg.dev/ghost-engine-labs/orchestrator/worker:${GITHUB_SHA}"
-          gcloud builds submit services/worker --tag "$IMAGE"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker build -f services/worker/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
 
       - name: Deploy to Cloud Run (worker)
         run: |
@@ -35,9 +42,34 @@ jobs:
             --allow-unauthenticated \
             --port 8080
 
+      - name: Get Service URL
+        id: url
+        run: |
+          set -euo pipefail
+          URL="$(gcloud run services describe worker --region us-central1 --format='value(status.url)')"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Service URL: $URL" >> $GITHUB_STEP_SUMMARY
+
       - name: Smoke test
         run: |
-          URL="$(gcloud run services describe worker --region us-central1 --format='value(status.url)')"
-          CODE="$(curl -s -o /dev/null -w '%{http_code}' "$URL/health")"
-          echo "Service URL: $URL" >> $GITHUB_STEP_SUMMARY
-          echo "GET /health → $CODE" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          URL="${{ steps.url.outputs.url }}"
+          ROOT_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$URL/")"
+          HEALTH_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$URL/health")"
+          echo "$ROOT_CODE" > root_status.txt
+          echo "$HEALTH_CODE" > health_status.txt
+          echo "GET / → $ROOT_CODE" >> $GITHUB_STEP_SUMMARY
+          echo "GET /health → $HEALTH_CODE" >> $GITHUB_STEP_SUMMARY
+          [ "$HEALTH_CODE" = "200" ] || { echo "::error::/health not 200 ($HEALTH_CODE)"; exit 1; }
+
+      - name: Upload URL & status artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-run-smoke-worker
+          path: |
+            root_status.txt
+            health_status.txt
+
+      - name: Post Auth to Google Cloud (OIDC)
+        if: always()
+        run: gcloud auth revoke --all || true
