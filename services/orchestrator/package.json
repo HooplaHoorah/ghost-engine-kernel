@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "mkdir -p dist && cp index.js dist/index.js && if [ -d public ]; then cp -R public dist/public; fi",
-    "start": "node dist/index.js",
+    "prestart": "npm run build",
+    "start": "node --enable-source-maps dist/index.js",
     "dev": "node index.js"
   },
   "dependencies": {
