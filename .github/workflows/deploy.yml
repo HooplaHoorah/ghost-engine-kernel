@@ -1,26 +1,26 @@
 name: Deploy to Cloud Run
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
 
 env:
   GCP_PROJECT_ID: ghost-engine-labs
   GCP_REGION: us-central1
   CLOUD_RUN_SERVICE: orchestrator
   ARTIFACT_REPO: orchestrator
-  WORKLOAD_IDENTITY_PROVIDER: projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
-  AUDIENCE: https://iam.googleapis.com/projects/22097403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+  WORKLOAD_IDENTITY_PROVIDER: projects/22897403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+  AUDIENCE: https://iam.googleapis.com/projects/22897403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
 
 jobs:
   deploy:
-    name: Build & Deploy (orchestrator)
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 30
     permissions:
       contents: read
-      id-token: write      # required for OIDC / Workload Identity Federation
+      id-token: write
     concurrency:
       group: deploy-${{ github.ref }}
       cancel-in-progress: true
@@ -33,7 +33,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
+          service_account: gh-actions-deployer@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
           audience: ${{ env.AUDIENCE }}
 
       - name: Set up gcloud
@@ -44,46 +44,84 @@ jobs:
       - name: Configure Artifact Registry Docker auth
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
-      - name: Build image
+      - name: Compute image tag
+        id: meta
         run: |
-          IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}"
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-          docker build -t "$IMAGE" .
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image (orchestrator)
+        working-directory: services/orchestrator
+        run: |
+          set -euxo pipefail
+          docker build -t "${{ steps.meta.outputs.image }}" .
+
+      - name: Local container smoke test (pre-deploy)
+        run: |
+          set -euxo pipefail
+          docker run -d --name smoke -e PORT=8080 -p 8080:8080 "${{ steps.meta.outputs.image }}"
+          # Wait up to ~40s for /health=200
+          for i in {1..20}; do
+            sleep 2
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health || true)"
+            if [ "$code" = "200" ]; then
+              echo "Local health check passed"
+              break
+            fi
+            if [ $i -eq 20 ]; then
+              echo "::error::Local container failed to start; dumping logs"
+              docker logs smoke || true
+              docker rm -f smoke || true
+              exit 1
+            fi
+          done
+          docker rm -f smoke
 
       - name: Push image
-        run: docker push "$IMAGE"
+        run: docker push "${{ steps.meta.outputs.image }}"
 
-      - name: Deploy to Cloud Run
-        id: deploy
+      - name: Deploy to Cloud Run (orchestrator)
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           gcloud run deploy "${{ env.CLOUD_RUN_SERVICE }}" \
             --project "${{ env.GCP_PROJECT_ID }}" \
             --region "${{ env.GCP_REGION }}" \
-            --image "$IMAGE" \
+            --image "${{ steps.meta.outputs.image }}" \
+            --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GIT_SHA=${{ github.sha }}"
+            --port 8080 \
+            --cpu 1 \
+            --memory 256Mi \
+            --min-instances 0 \
+            --max-instances 2 \
+            --timeout 600 \
+            --set-env-vars PORT=8080,AGENT_MODE=off
 
       - name: Get Service URL
         id: url
         run: |
-          echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE \
-            --region $GCP_REGION --format='value(status.url)')" >> $GITHUB_OUTPUT
+          gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --format='value(status.url)' | tee service_url.txt
+          echo "url=$(cat service_url.txt)" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke test
+      - name: Remote smoke test
         run: |
-          set -euo pipefail
-          ROOT_CODE=$(curl -fsS -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/")
-          HEALTH_CODE=$(curl -fsS -o /dev/null -w "%{http_code}\n" "${{ steps.url.outputs.url }}/health")
+          set -euxo pipefail
+          URL="${{ steps.url.outputs.url }}"
+          echo "Service URL: $URL"
+          ROOT_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$URL/")"
+          HEALTH_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$URL/health")"
           echo "$ROOT_CODE" > root_status.txt
           echo "$HEALTH_CODE" > health_status.txt
-          [ "$HEALTH_CODE" = "200" ] || (echo "::error::/health not 200 ($HEALTH_CODE)" && exit 1)
+          test "$HEALTH_CODE" = "200"
 
       - name: Upload URL & status artifact
         uses: actions/upload-artifact@v4
         with:
           name: cloud-run-smoke
           path: |
+            service_url.txt
             root_status.txt
             health_status.txt
           if-no-files-found: error
@@ -91,4 +129,5 @@ jobs:
       - name: Show recent logs on failure
         if: failure()
         run: |
-          gcloud run services logs read "${{ env.CLOUD_RUN_SERVICE }}" --region "${{ env.GCP_REGION }}" --limit=100 || true
+          gcloud run services logs read "${{ env.CLOUD_RUN_SERVICE }}" \
+            --region "${{ env.GCP_REGION }}" --limit=200 || true
