@@ -5,10 +5,18 @@ import { fileURLToPath } from 'url';
 import cors from 'cors';
 
 const app = express();
-const port = process.env.PORT || 8080;
 
-// CORS (GET only) + preflight
-app.use(cors({ origin: '*', methods: ['GET'], allowedHeaders: ['Content-Type'] }));
+// Always respect Cloud Run's injected port
+const port = parseInt(process.env.PORT, 10) || 8080;
+
+// CORS: GET only + preflight
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET'],
+    allowedHeaders: ['Content-Type'],
+  })
+);
 app.options('*', cors());
 
 // Parse JSON bodies (future-proofing)
@@ -19,10 +27,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use('/status', express.static(path.join(__dirname, 'public')));
 
-// --- Agent toggle ---
+// --- Agent toggle (optional UX) ---
 const AGENT_MODE = (process.env.AGENT_MODE || 'off').toLowerCase();
 
-// Health check (Cloud Run probe)
+// Health (Cloud Run probe)
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, service: 'ghost-orchestrator' });
 });
@@ -40,7 +48,7 @@ app.get('/agent/ping', (_req, res) => {
   return res.status(404).json({ ok: false, agent: 'off' });
 });
 
-// Cloud Run requires binding to 0.0.0.0:PORT
+// Cloud Run requires binding to 0.0.0.0:$PORT
 app.listen(port, '0.0.0.0', () => {
   console.log(`orchestrator listening on ${port} (agent=${AGENT_MODE})`);
 });
