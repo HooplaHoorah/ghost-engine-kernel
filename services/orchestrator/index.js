@@ -1,10 +1,17 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 const port = process.env.PORT || 8080;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Parse JSON bodies (future-proofing for /tasks, etc.)
 app.use(express.json());
+
+app.use('/status', express.static(path.join(__dirname, 'public')));
 
 // --- Agent toggle ---
 const AGENT_MODE = (process.env.AGENT_MODE || 'off').toLowerCase();
