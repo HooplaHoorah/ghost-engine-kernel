@@ -1,7 +1,12 @@
 import express from 'express';
+import cors from 'cors';
 
 const app = express();
 const port = process.env.PORT || 8080;
+
+// Allow CORS for GET requests
+app.use(cors({ origin: '*', methods: ['GET'], allowedHeaders: ['Content-Type'] }));
+app.options('*', cors());
 
 // Parse JSON bodies (future-proofing for /tasks, etc.)
 app.use(express.json());
