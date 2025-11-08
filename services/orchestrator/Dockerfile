@@ -1,23 +1,28 @@
-FROM node:20-alpine AS base
+# ---------- deps ----------
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-FROM base AS deps
 COPY package*.json ./
-RUN npm ci --omit-dev
+RUN npm ci --omit=dev
 
-FROM base AS build
-COPY --from=deps /app/node_modules /app/node_modules
+# ---------- build ----------
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
 COPY . .
 RUN npm run build
 
+# ---------- runtime ----------
 FROM node:20-alpine AS runtime
-WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
-# Ensure ESM works at runtime
-COPY package*.json ./
+WORKDIR /app
+
+# Copy runtime deps and built app
 COPY --from=deps  /app/node_modules /app/node_modules
-COPY --from=build /app/dist         /app/dist
-COPY --from=build /app/public       /app/public
+COPY --from=build /app/package.json /app/package.json
+COPY --from=build /app/dist        /app/dist
+
+EXPOSE 8080
 USER node
 CMD ["node", "dist/index.js"]
