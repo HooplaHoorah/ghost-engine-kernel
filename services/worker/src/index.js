@@ -1,5 +1,24 @@
 import express from "express";
+import cors from "cors";
+
 const app = express();
+
+app.use(
+  cors({
+    methods: ["GET"],
+  })
+);
+
+app.options("*", cors());
+
+app.use((req, res, next) => {
+  if (req.method !== "GET") {
+    res.set("Allow", "GET");
+    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
+  }
+  next();
+});
+
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
