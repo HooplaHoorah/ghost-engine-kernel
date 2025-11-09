@@ -1,31 +1,29 @@
 name: Deploy Worker to Cloud Run
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "services/worker/**"
+      - "Dockerfile"
+      - "package.json"
+      - ".github/workflows/deploy-worker.yml"
 
 env:
-  GCP_PROJECT_ID: ghost-engine-labs
-  GCP_REGION: us-central1
-  CLOUD_RUN_SERVICE: worker
-  ARTIFACT_REPO: worker
-  WORKLOAD_IDENTITY_PROVIDER: projects/22897034143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
-  SERVICE_ACCOUNT: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
+  PROJECT_ID: ghost-engine-labs
+  REGION: us-central1
+  SERVICE: worker
+  REPO: ghost-engine
+  IMAGE: us-central1-docker.pkg.dev/ghost-engine-labs/ghost-engine/worker
 
 jobs:
   deploy:
-    name: Build & Deploy (worker)
     runs-on: ubuntu-latest
-    environment: production
 
     permissions:
       contents: read
       id-token: write
-
-    concurrency:
-      group: deploy-worker-${{ github.ref }}
-      cancel-in-progress: true
 
     steps:
       - name: Checkout
@@ -34,55 +32,40 @@ jobs:
       - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.SERVICE_ACCOUNT }}
+          workload_identity_provider: 'projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc'
+          service_account: 'gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com'
+          audience: '//iam.googleapis.com/projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc'
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Configure Artifact Registry Docker auth
-        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+      - name: Configure Artifact Registry docker auth
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: Build image
-        id: build
+      - name: Build & tag
+        working-directory: services/worker
         run: |
-          set -euo pipefail
-          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${CLOUD_RUN_SERVICE}:${GITHUB_SHA}"
-          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
-          docker build -t "${IMAGE}" ./services/worker
+          docker build -t "$IMAGE:github-${GITHUB_SHA}" -t "$IMAGE:latest" ../../
 
-      - name: Push image
-        run: docker push "${IMAGE}"
-
-      - name: Deploy to Cloud Run
+      - name: Push
         run: |
-          set -euo pipefail
-          gcloud run deploy "${CLOUD_RUN_SERVICE}" \
-            --project "${GCP_PROJECT_ID}" \
-            --region "${GCP_REGION}" \
-            --image "${IMAGE}" \
+          docker push "$IMAGE:github-${GITHUB_SHA}"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy to Cloud Run (as a service)
+        id: deploy
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE:github-${GITHUB_SHA}" \
+            --region "$REGION" \
+            --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GIT_SHA=${GITHUB_SHA}" \
             --port 8080 \
+            --max-instances 3 \
             --quiet
+          URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
 
-      - name: Get Service URL
-        id: url
+      - name: Smoke: /health CORS header
         run: |
-          echo "url=$(gcloud run services describe ${CLOUD_RUN_SERVICE} --region ${GCP_REGION} --format='value(status.url)')" >> "$GITHUB_OUTPUT"
-
-      - name: Remote smoke test
-        run: |
-          set -euo pipefail
-          http="${{ steps.url.outputs.url }}"
-          echo "Service URL: ${http}"
-          HEALTH_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" "${http}/health")
-          echo "health: ${HEALTH_CODE}"
-          [ "${HEALTH_CODE}" = "200" ]
-
-      - name: Show recent logs on failure
-        if: failure()
-        run: |
-          gcloud run services logs read "${CLOUD_RUN_SERVICE}" --region "${GCP_REGION}" --limit=100 || true
+          curl -sI -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
