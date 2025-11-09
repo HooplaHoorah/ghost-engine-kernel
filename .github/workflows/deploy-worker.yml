@@ -21,12 +21,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - id: auth
-        name: Auth to Google Cloud (OIDC)
+      - name: Ensure auth inputs present
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -z "${{ secrets.GCP_CREDENTIALS }}" ]; then
+            echo "Missing Google Cloud auth inputs. Set secrets GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_SERVICE_ACCOUNT (preferred) or GCP_CREDENTIALS (JSON key)."
+            exit 1
+          fi
+
+      - id: auth_wif
+        name: Auth to Google Cloud (OIDC via WIF)
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - id: auth_json
+        name: Auth to Google Cloud (JSON key)
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_CREDENTIALS != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
