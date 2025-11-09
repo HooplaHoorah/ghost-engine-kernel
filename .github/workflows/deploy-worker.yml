@@ -17,32 +17,36 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      WIF_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Ensure auth inputs present
-        shell: bash
         run: |
-          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -z "${{ secrets.GCP_CREDENTIALS }}" ]; then
-            echo "Missing Google Cloud auth inputs. Set secrets GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_SERVICE_ACCOUNT (preferred) or GCP_CREDENTIALS (JSON key)."
+          if [ -z "${WIF_PROVIDER}" ] && [ -z "${CREDENTIALS_JSON}" ]; then
+            echo "Missing Google Cloud auth inputs. Set GCP_WORKLOAD_IDENTITY_PROVIDER+GCP_SERVICE_ACCOUNT (preferred) or GCP_CREDENTIALS (JSON key)."
             exit 1
           fi
 
       - id: auth_wif
+        if: env.WIF_PROVIDER != '' && env.WIF_SA != ''
         name: Auth to Google Cloud (OIDC via WIF)
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SA }}
 
       - id: auth_json
+        if: env.WIF_PROVIDER == '' && env.CREDENTIALS_JSON != ''
         name: Auth to Google Cloud (JSON key)
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_CREDENTIALS != '' }}
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          credentials_json: ${{ env.CREDENTIALS_JSON }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -57,7 +61,7 @@ jobs:
           SERVICE="${{ vars.WORKER_SERVICE }}"
           if [[ -z "$SERVICE" ]]; then SERVICE="worker"; fi
 
-          gcloud config set project "${{ secrets.GCP_PROJECT_ID }}"
+          gcloud config set project "${GCP_PROJECT_ID}"
 
           gcloud run deploy "$SERVICE" \
             --source=. \
