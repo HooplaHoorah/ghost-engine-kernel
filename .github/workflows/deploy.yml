@@ -9,6 +9,8 @@ on:
   workflow_dispatch:
   push:
     branches: ["main"]
+    paths:
+      - 'services/orchestrator/**'
 
 permissions:
   contents: read
@@ -22,16 +24,12 @@ jobs:
       WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       WIF_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      ORCH_SERVICE: ${{ vars.ORCH_SERVICE }}
+      RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Ensure auth inputs present
-        run: |
-          if [ -z "${WIF_PROVIDER}" ] && [ -z "${CREDENTIALS_JSON}" ]; then
-            echo "Missing Google Cloud auth inputs. Set GCP_WORKLOAD_IDENTITY_PROVIDER+GCP_SERVICE_ACCOUNT (preferred) or GCP_CREDENTIALS (JSON key)."
-            exit 1
-          fi
 
       - id: auth_wif
         if: env.WIF_PROVIDER != '' && env.WIF_SA != ''
@@ -51,9 +49,15 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Enable required APIs (Run, Cloud Build, Artifact Registry)
+      - name: Enable required APIs (Run, Cloud Build, AR, CRM, Service Usage, IAM Creds)
         run: |
-          gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
+          gcloud services enable \
+            run.googleapis.com \
+            cloudbuild.googleapis.com \
+            artifactregistry.googleapis.com \
+            cloudresourcemanager.googleapis.com \
+            serviceusage.googleapis.com \
+            iamcredentials.googleapis.com \
             --project "${GCP_PROJECT_ID}" --quiet
 
       - id: deploy
@@ -62,20 +66,16 @@ jobs:
         working-directory: services/orchestrator
         run: |
           set -euo pipefail
-          REGION="${{ vars.GCP_REGION }}"
-          if [[ -z "$REGION" ]]; then REGION="us-central1"; fi
-          SERVICE="${{ vars.ORCH_SERVICE }}"
-          if [[ -z "$SERVICE" ]]; then SERVICE="orchestrator"; fi
-
+          REGION="${GCP_REGION}"
+          SERVICE="${ORCH_SERVICE}"
           gcloud config set project "${GCP_PROJECT_ID}"
-
           gcloud run deploy "$SERVICE" \
             --source=. \
             --region="$REGION" \
             --platform=managed \
+            --service-account="${RUNTIME_SA}" \
             --allow-unauthenticated \
             --quiet
-
           URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed $SERVICE to $URL"
