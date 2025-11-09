@@ -1,30 +1,31 @@
 name: Deploy Worker to Cloud Run
 
 on:
-  workflow_dispatch:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   GCP_PROJECT_ID: ghost-engine-labs
   GCP_REGION: us-central1
-
-  # service + repo
   CLOUD_RUN_SERVICE: worker
-  ARTIFACT_REPO: orchestrator   # reuse the same Artifact Registry repo; fine to keep
-
-  # OIDC (from your Cloud Shell output)
-  WORKLOAD_IDENTITY_PROVIDER: projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+  ARTIFACT_REPO: worker
+  WORKLOAD_IDENTITY_PROVIDER: projects/22897034143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
   SERVICE_ACCOUNT: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
-  AUDIENCE: //iam.googleapis.com/projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
 
 jobs:
   deploy:
+    name: Build & Deploy (worker)
     runs-on: ubuntu-latest
     environment: production
+
     permissions:
       contents: read
       id-token: write
+
+    concurrency:
+      group: deploy-worker-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
@@ -35,7 +36,6 @@ jobs:
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-          audience: ${{ env.AUDIENCE }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -43,47 +43,46 @@ jobs:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Configure Artifact Registry Docker auth
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-
-      - name: Compute image tag
-        id: tag
-        run: echo "IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
 
       - name: Build image
-        run: docker build -t "${{ steps.tag.outputs.IMAGE }}" ./services/worker
+        id: build
+        run: |
+          set -euo pipefail
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${CLOUD_RUN_SERVICE}:${GITHUB_SHA}"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          docker build -t "${IMAGE}" ./services/worker
 
       - name: Push image
-        run: docker push "${{ steps.tag.outputs.IMAGE }}"
+        run: docker push "${IMAGE}"
 
       - name: Deploy to Cloud Run
         run: |
           set -euo pipefail
-          gcloud run deploy "${{ env.CLOUD_RUN_SERVICE }}" \
-            --project "${{ env.GCP_PROJECT_ID }}" \
-            --region "${{ env.GCP_REGION }}" \
-            --image "${{ steps.tag.outputs.IMAGE }}" \
+          gcloud run deploy "${CLOUD_RUN_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --image "${IMAGE}" \
             --allow-unauthenticated \
-            --set-env-vars "GIT_SHA=${{ github.sha }}"
+            --set-env-vars "GIT_SHA=${GITHUB_SHA}" \
+            --port 8080 \
+            --quiet
 
       - name: Get Service URL
         id: url
-        run: echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE --region=$GCP_REGION --format='value(status.url)')" >> $GITHUB_OUTPUT
+        run: |
+          echo "url=$(gcloud run services describe ${CLOUD_RUN_SERVICE} --region ${GCP_REGION} --format='value(status.url)')" >> "$GITHUB_OUTPUT"
 
-      - name: Remote smoke test (/health)
+      - name: Remote smoke test
         run: |
           set -euo pipefail
-          http="curl -sfS -o /dev/null -w '%{http_code}\n'"
-          HEALTH_CODE=$(eval "$http" "${{ steps.url.outputs.url }}/health")
-          echo "$HEALTH_CODE" > health_status.txt
-          [ "$HEALTH_CODE" = "200" ] || (echo "::error::/health not 200 ($HEALTH_CODE)"; exit 1)
-
-      - name: Upload URL & status artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cloud-run-worker-smoke
-          path: |
-            health_status.txt
+          http="${{ steps.url.outputs.url }}"
+          echo "Service URL: ${http}"
+          HEALTH_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" "${http}/health")
+          echo "health: ${HEALTH_CODE}"
+          [ "${HEALTH_CODE}" = "200" ]
 
       - name: Show recent logs on failure
         if: failure()
-        run: gcloud run services logs read "$CLOUD_RUN_SERVICE" --region "$GCP_REGION" --limit=100 || true
+        run: |
+          gcloud run services logs read "${CLOUD_RUN_SERVICE}" --region "${GCP_REGION}" --limit=100 || true
