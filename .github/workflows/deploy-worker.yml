@@ -27,6 +27,8 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION }}
       WORKER_SERVICE: ${{ vars.WORKER_SERVICE }}
       RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+      AR_REPO: cloud-run-source-deploy
+      GIT_SHA: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,17 +62,31 @@ jobs:
             iamcredentials.googleapis.com \
             --project "${GCP_PROJECT_ID}" --quiet
 
-      - id: deploy
-        name: Deploy Worker
+      - id: build
+        name: Build container image via Cloud Build
         shell: bash
         working-directory: services/worker
         run: |
           set -euo pipefail
           REGION="${GCP_REGION}"
           SERVICE="${WORKER_SERVICE}"
-          gcloud config set project "${GCP_PROJECT_ID}"
+          IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO}/${SERVICE}:${GIT_SHA}"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          gcloud builds submit . --tag "$IMAGE" --project "${GCP_PROJECT_ID}"
+          LOGURL="$(gcloud builds list --project ${GCP_PROJECT_ID} --sort-by=~createTime --limit=1 --format='value(logUrl)')"
+          echo "cloudbuild_log=$LOGURL" >> "$GITHUB_OUTPUT"
+          echo "Cloud Build logs: $LOGURL"
+
+      - id: deploy
+        name: Deploy Worker from image
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGION="${GCP_REGION}"
+          SERVICE="${WORKER_SERVICE}"
+          IMAGE="${{ steps.build.outputs.image }}"
           gcloud run deploy "$SERVICE" \
-            --source=. \
+            --image="$IMAGE" \
             --region="$REGION" \
             --platform=managed \
             --service-account="${RUNTIME_SA}" \
