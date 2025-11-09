@@ -54,6 +54,7 @@ jobs:
       - id: deploy
         name: Deploy Worker
         shell: bash
+        working-directory: services/worker
         run: |
           set -euo pipefail
           REGION="${{ vars.GCP_REGION }}"

@@ -54,6 +54,7 @@ jobs:
       - id: deploy
         name: Deploy Orchestrator
         shell: bash
+        working-directory: services/orchestrator
         run: |
           set -euo pipefail
           REGION="${{ vars.GCP_REGION }}"
