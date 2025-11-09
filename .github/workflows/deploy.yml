@@ -53,11 +53,11 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed $SERVICE to $URL"
 
-      - name: Smoke: /health CORS header (GET)
+      - name: "Smoke: /health CORS header (GET)"
         shell: bash
         run: |
           curl -s -o /dev/null -D - -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
 
-      - name: Smoke: /status renders HTML
+      - name: "Smoke: /status renders HTML"
         run: |
           curl -fsSL "${{ steps.deploy.outputs.url }}/status" | head -n 20
