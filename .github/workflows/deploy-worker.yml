@@ -4,17 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [ "main" ]
-    paths:
-      - "services/worker/**"
-      - ".github/workflows/deploy-worker.yml"
 
 env:
   GCP_PROJECT_ID: ghost-engine-labs
   GCP_REGION: us-central1
   CLOUD_RUN_SERVICE: worker
-  ARTIFACT_REPO: worker
-  WORKLOAD_IDENTITY_PROVIDER: projects/22897403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
-  AUDIENCE: https://iam.googleapis.com/projects/22897403143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+  ARTIFACT_REPO: orchestrator
+  WORKLOAD_IDENTITY_PROVIDER: //iam.googleapis.com/projects/22897043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc
+  SERVICE_ACCOUNT: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -23,13 +20,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    concurrency:
-      group: deploy-worker-${{ github.ref }}
-      cancel-in-progress: true
-
-    defaults:
-      run:
-        shell: bash
 
     steps:
       - name: Checkout
@@ -39,8 +29,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com
-          audience: ${{ env.AUDIENCE }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -48,22 +37,23 @@ jobs:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Configure Artifact Registry Docker auth
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
 
       - name: Build image
         working-directory: services/worker
         env:
           IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
         run: |
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
           docker build -t "$IMAGE" .
 
       - name: Push image
+        env:
+          IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
         run: docker push "$IMAGE"
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (worker)
         env:
-          IMAGE: ${{ env.IMAGE }}
+          IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
         run: |
           set -euo pipefail
           gcloud run deploy "${{ env.CLOUD_RUN_SERVICE }}" \
@@ -77,18 +67,14 @@ jobs:
       - name: Get Service URL
         id: url
         run: |
-          echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE --region $GCP_REGION --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+          echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE --region $GCP_REGION --format='value(status.url)')" >> $GITHUB_OUTPUT
 
-      - name: Smoke test (/health)
+      - name: Remote smoke test
+        env:
+          BASE_URL: ${{ steps.url.outputs.url }}
         run: |
           set -euo pipefail
-          code=$(curl -fsS -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.url }}/health")
-          echo "Health HTTP $code"
-          [ "$code" = "200" ] || (echo "::error::/health not 200 ($code)"; exit 1)
-
-      - name: Upload URL & status artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cloud-run-worker-smoke
-          path: |
-            $GITHUB_OUTPUT
+          echo "Service: $BASE_URL"
+          HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/health")
+          echo "health: $HEALTH_CODE"
+          [ "$HEALTH_CODE" = "200" ] || (echo "::error::/health not 200 ($HEALTH_CODE)" && exit 1)
