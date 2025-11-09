@@ -63,7 +63,7 @@ jobs:
             --project "${GCP_PROJECT_ID}" --quiet
 
       - id: build
-        name: Build container image via Cloud Build
+        name: Build container image via Cloud Build (async + poll)
         shell: bash
         working-directory: services/worker
         run: |
@@ -72,8 +72,22 @@ jobs:
           SERVICE="${WORKER_SERVICE}"
           IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO}/${SERVICE}:${GIT_SHA}"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-          gcloud builds submit . --tag "$IMAGE" --project "${GCP_PROJECT_ID}"
-          LOGURL="$(gcloud builds list --project ${GCP_PROJECT_ID} --sort-by=~createTime --limit=1 --format='value(logUrl)')"
+
+          # Start build without streaming logs (avoids viewer perms requirement)
+          BUILD_ID=$(gcloud builds submit . --tag "$IMAGE" --project "${GCP_PROJECT_ID}" --async --format='value(id)')
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+
+          # Poll build status until done
+          for i in $(seq 1 120); do
+            STATUS=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(status)') || STATUS=UNKNOWN
+            if [[ "$STATUS" == "SUCCESS" ]]; then break; fi
+            if [[ "$STATUS" == "FAILURE" || "$STATUS" == "CANCELLED" || "$STATUS" == "EXPIRED" ]]; then
+              LOGURL=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(logUrl)');
+              echo "Cloud Build failed ($STATUS). Logs: $LOGURL"; exit 1;
+            fi
+            sleep 5
+          done
+          LOGURL=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(logUrl)')
           echo "cloudbuild_log=$LOGURL" >> "$GITHUB_OUTPUT"
           echo "Cloud Build logs: $LOGURL"
 
