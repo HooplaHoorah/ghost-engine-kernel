@@ -1,4 +1,5 @@
 name: Deploy Worker to Cloud Run
+run-name: Deploy Worker to Cloud Run — ${{ github.ref_name }} by ${{ github.actor }}
 
 on:
   workflow_dispatch:
