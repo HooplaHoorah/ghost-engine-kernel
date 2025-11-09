@@ -1,76 +1,63 @@
 name: Deploy to Cloud Run (orchestrator)
-run-name: Deploy to Cloud Run (orchestrator) — ${{ github.ref_name }} by ${{ github.actor }}
+run-name: Orchestrator — ${{ github.ref_name }} by ${{ github.actor }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
-    paths:
-      - "services/orchestrator/**"
-      - "Dockerfile"
-      - "package.json"
-      - ".github/workflows/deploy.yml"
+    branches: ["main"]
 
-env:
-  PROJECT_ID: ghost-engine-labs
-  REGION: us-central1
-  SERVICE: orchestrator
-  REPO: ghost-engine # Artifact Registry (docker) repo name you created in us-central1
-  IMAGE: us-central1-docker.pkg.dev/ghost-engine-labs/ghost-engine/orchestrator
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Auth to Google Cloud (OIDC)
+      - id: auth
+        name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc'
-          service_account: 'gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com'
-          audience: '//iam.googleapis.com/projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc'
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up gcloud
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Artifact Registry docker auth
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-
-      - name: Build & tag
-        working-directory: services/orchestrator
+      - id: deploy
+        name: Deploy Orchestrator
+        shell: bash
         run: |
-          docker build -t "$IMAGE:github-${GITHUB_SHA}" -t "$IMAGE:latest" ../../
+          set -euo pipefail
+          REGION="${{ vars.GCP_REGION }}"
+          if [[ -z "$REGION" ]]; then REGION="us-central1"; fi
+          SERVICE="${{ vars.ORCH_SERVICE }}"
+          if [[ -z "$SERVICE" ]]; then SERVICE="orchestrator"; fi
 
-      - name: Push
-        run: |
-          docker push "$IMAGE:github-${GITHUB_SHA}"
-          docker push "$IMAGE:latest"
+          gcloud config set project "${{ secrets.GCP_PROJECT_ID }}"
 
-      - name: Deploy to Cloud Run
-        id: deploy
-        run: |
           gcloud run deploy "$SERVICE" \
-            --image "$IMAGE:github-${GITHUB_SHA}" \
-            --region "$REGION" \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 8080 \
-            --max-instances 3 \
-            --quiet
+            --source=. \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated
+
           URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed $SERVICE to $URL"
 
-      - name: Smoke: /health CORS header
+      - name: Smoke: /health CORS header (GET)
+        shell: bash
         run: |
-          curl -sI -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
+          curl -s -o /dev/null -D - -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
 
-      - name: Smoke: /status HTML
+      - name: Smoke: /status renders HTML
         run: |
-          curl -fsSL "${{ steps.deploy.outputs.url }}/status" | head -n 5
+          curl -fsSL "${{ steps.deploy.outputs.url }}/status" | head -n 20

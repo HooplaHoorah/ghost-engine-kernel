@@ -1,72 +1,59 @@
 name: Deploy Worker to Cloud Run
-run-name: Deploy Worker to Cloud Run — ${{ github.ref_name }} by ${{ github.actor }}
+run-name: Deploy Worker — ${{ github.ref_name }} by ${{ github.actor }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
-    paths:
-      - "services/worker/**"
-      - "Dockerfile"
-      - "package.json"
-      - ".github/workflows/deploy-worker.yml"
+    branches: ["main"]
 
-env:
-  PROJECT_ID: ghost-engine-labs
-  REGION: us-central1
-  SERVICE: worker
-  REPO: ghost-engine
-  IMAGE: us-central1-docker.pkg.dev/ghost-engine-labs/ghost-engine/worker
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Auth to Google Cloud (OIDC)
+      - id: auth
+        name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc'
-          service_account: 'gh-actions-deployer@ghost-engine-labs.iam.gserviceaccount.com'
-          audience: '//iam.googleapis.com/projects/22097043143/locations/global/workloadIdentityPools/github-pool/providers/github-oidc'
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up gcloud
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Artifact Registry docker auth
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-
-      - name: Build & tag
-        working-directory: services/worker
+      - id: deploy
+        name: Deploy Worker
+        shell: bash
         run: |
-          docker build -t "$IMAGE:github-${GITHUB_SHA}" -t "$IMAGE:latest" ../../
+          set -euo pipefail
+          REGION="${{ vars.GCP_REGION }}"
+          if [[ -z "$REGION" ]]; then REGION="us-central1"; fi
+          SERVICE="${{ vars.WORKER_SERVICE }}"
+          if [[ -z "$SERVICE" ]]; then SERVICE="worker"; fi
 
-      - name: Push
-        run: |
-          docker push "$IMAGE:github-${GITHUB_SHA}"
-          docker push "$IMAGE:latest"
+          gcloud config set project "${{ secrets.GCP_PROJECT_ID }}"
 
-      - name: Deploy to Cloud Run (as a service)
-        id: deploy
-        run: |
           gcloud run deploy "$SERVICE" \
-            --image "$IMAGE:github-${GITHUB_SHA}" \
-            --region "$REGION" \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 8080 \
-            --max-instances 3 \
-            --quiet
+            --source=. \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated
+
           URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed $SERVICE to $URL"
 
-      - name: Smoke: /health CORS header
+      - name: Smoke: /health CORS header (GET)
+        shell: bash
         run: |
-          curl -sI -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
+          curl -s -o /dev/null -D - -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
