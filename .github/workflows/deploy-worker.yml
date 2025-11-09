@@ -63,21 +63,24 @@ jobs:
             --project "${GCP_PROJECT_ID}" --quiet
 
       - id: build
-        name: Build container image via Cloud Build (async + poll)
+        name: Build container image via Cloud Build (Dockerfile or Buildpacks)
         shell: bash
         working-directory: services/worker
         run: |
           set -euo pipefail
-          REGION="${GCP_REGION}"
           SERVICE="${WORKER_SERVICE}"
           IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO}/${SERVICE}:${GIT_SHA}"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
-          # Start build without streaming logs (avoids viewer perms requirement)
-          BUILD_ID=$(gcloud builds submit . --tag "$IMAGE" --project "${GCP_PROJECT_ID}" --async --format='value(id)')
-          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          if [[ -f Dockerfile ]]; then
+            echo 'Dockerfile found — using docker build';
+            BUILD_ID=$(gcloud builds submit . --tag "$IMAGE" --project "${GCP_PROJECT_ID}" --async --format='value(id)');
+          else
+            echo 'No Dockerfile — using buildpacks';
+            BUILD_ID=$(gcloud builds submit . --pack image="$IMAGE" --project "${GCP_PROJECT_ID}" --async --format='value(id)');
+          fi
 
-          # Poll build status until done
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
           for i in $(seq 1 120); do
             STATUS=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(status)') || STATUS=UNKNOWN
             if [[ "$STATUS" == "SUCCESS" ]]; then break; fi
