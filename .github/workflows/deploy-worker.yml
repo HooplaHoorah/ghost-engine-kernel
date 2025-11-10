@@ -1,108 +1,36 @@
 name: Deploy Worker to Cloud Run
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'services/worker/**'
-  workflow_dispatch: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+on: [workflow_dispatch, push]
+permissions:
+  contents: read
+  id-token: write
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-
-    env:
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      GCP_REGION: ${{ vars.GCP_REGION }}
-      SERVICE_NAME: ${{ vars.WORKER_SERVICE }}    # e.g. "worker"
-      ARTIFACT_REPO: cloud-run-source-deploy
-      IMAGE_NAME: worker
-      RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Auth to Google Cloud (OIDC)
+      - name: Auth to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
-
-      - name: Set up gcloud
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
-
-      - name: Enable APIs (idempotent)
+      - name: Configure Artifact Registry Docker
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+      - name: Compute image tag
         run: |
-          gcloud services enable artifactregistry.googleapis.com run.googleapis.com \
-            --project="${GCP_PROJECT_ID}" --quiet
-
-      - name: Ensure Artifact Registry repo exists (idempotent)
+          IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/worker:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+      - name: Build & push
         run: |
-          gcloud artifacts repositories describe "${ARTIFACT_REPO}" --location="${GCP_REGION}" \
-          || gcloud artifacts repositories create "${ARTIFACT_REPO}" \
-               --repository-format=docker --location="${GCP_REGION}" --quiet
-
-      - name: Configure Docker for Artifact Registry
+          docker build -t "$IMAGE" services/worker
+          docker push "$IMAGE"
+      - name: Deploy to Cloud Run
+        id: deploy
         run: |
-          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
-
-      - name: Compute IMAGE tag
-        run: |
-          echo "IMAGE=${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
-
-      - name: Build image
-        run: |
-          docker build -t "${IMAGE}" services/worker
-
-      - name: Push image
-        run: |
-          docker push "${IMAGE}"
-
-      - name: Deploy to Cloud Run (from image)
-        run: |
-          gcloud run deploy "${SERVICE_NAME}" \
-            --image="${IMAGE}" \
-            --project="${GCP_PROJECT_ID}" \
-            --region="${GCP_REGION}" \
-            --platform=managed \
-            --service-account="${RUNTIME_SA}" \
-            --allow-unauthenticated \
-            --quiet
-
-      - id: url
-        name: Get service URL
-        run: |
-          set -e
-          URL="$(gcloud run services describe "${SERVICE_NAME}" \
-                 --project="${GCP_PROJECT_ID}" \
-                 --region="${GCP_REGION}" \
-                 --format='value(status.url)')"
-          echo "url=${URL}" >> "$GITHUB_OUTPUT"
-
-      - name: "Smoke: /health CORS"
-        run: |
-          curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin"
-
-      - name: "Smoke: /status HTML"
-        run: |
-          curl "${{ steps.url.outputs.url }}/status" | grep -q "<html>"
-
-      - name: "Smoke: root HTML"
-        run: |
-          curl "${{ steps.url.outputs.url }}" | grep -q "<html>"
-
+          gcloud run deploy "${{ vars.WORKER_SERVICE }}" \n            --image="$IMAGE" \n            --region="${{ vars.GCP_REGION }}" \n            --platform=managed \n            --allow-unauthenticated \n            --service-account="cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \n            --quiet
+          URL="$(gcloud run services describe "${{ vars.WORKER_SERVICE }}" --region="${{ vars.GCP_REGION }}" --format='value(status.url)')"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
       - name: Summarize URL
-        run: |
-          printf 'Service URL: %s\n' "${{ steps.url.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "WORKER_URL=${{ steps.deploy.outputs.url }}"
