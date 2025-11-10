@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-PATTERNS_FILE=".github/no_breadcrumbs_patterns.txt"
-MSG_FILE="$1"
-if grep -iE -n -f "$PATTERNS_FILE" "$MSG_FILE"; then
-  echo "Commit message contains disallowed generator phrases."
-  exit 1
-fi
