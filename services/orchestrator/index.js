@@ -1,25 +1,23 @@
-import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
-import cors from "cors";
+const express = require('express');
+const path = require('path');
 
 const app = express();
-const port = parseInt(process.env.PORT, 10) || 8080;
+const port = process.env.PORT || 8080;
 
-// CORS: GET + preflight
-app.use(cors({ origin: "*", methods: ["GET"], allowedHeaders: ["Content-Type"] }));
-app.options("*", cors());
+// basic health endpoint for Cloud Run
+app.get('/health', (req, res) => res.status(200).send('ok'));
 
-// JSON (future-proofing)
-app.use(express.json());
+// serve static landing if present
+const pub = path.join(__dirname, 'public');
+app.use(express.static(pub));
 
-// ESM-safe __dirname + static /status
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-app.use("/status", express.static(path.join(__dirname, "public")));
+app.get('/', (req, res) => {
+  const index = path.join(pub, 'index.html');
+  res.sendFile(index, err => {
+    if (err) res.status(200).send('Ghost Engine Orchestrator is running');
+  });
+});
 
-// Health + root
-app.get("/health", (_req, res) => res.status(200).json({ ok: true, service: "ghost-orchestrator" }));
-app.get("/",       (_req, res) => res.status(200).json({ service: "ghost-orchestrator", status: "ready" }));
-
-app.listen(port, "0.0.0.0", () => console.log(`orchestrator listening on ${port}`));
+app.listen(port, '0.0.0.0', () => {
+  console.log(`orchestrator listening on ${port}`);
+});

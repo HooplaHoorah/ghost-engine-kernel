@@ -1,16 +1,12 @@
 {
-  "name": "ghost-orchestrator",
-  "version": "0.0.1",
+  "name": "orchestrator",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "build": "mkdir -p dist && cp index.js dist/index.js && if [ -d public ]; then cp -R public dist/public; fi",
-    "prestart": "npm run build",
-    "start": "node --enable-source-maps dist/index.js",
-    "dev": "node index.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5"
+    "express": "^4.19.2"
   }
 }
