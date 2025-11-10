@@ -1,119 +1,69 @@
 name: Deploy Worker to Cloud Run
-run-name: Deploy Worker — ${{ github.ref_name }} by ${{ github.actor }}
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/worker/**']
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-on:
-  workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - 'services/worker/**'
-
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
     env:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      WIF_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       GCP_REGION: ${{ vars.GCP_REGION }}
-      WORKER_SERVICE: ${{ vars.WORKER_SERVICE }}
+      SERVICE_NAME: ${{ vars.WORKER_SERVICE }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/worker:${{ github.sha }}
       RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-      AR_REPO: cloud-run-source-deploy
-      GIT_SHA: ${{ github.sha }}
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - id: auth_wif
-        if: env.WIF_PROVIDER != '' && env.WIF_SA != ''
-        name: Auth to Google Cloud (OIDC via WIF)
+      - id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.WIF_SA }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
 
-      - id: auth_json
-        if: env.WIF_PROVIDER == '' && env.CREDENTIALS_JSON != ''
-        name: Auth to Google Cloud (JSON key)
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ env.CREDENTIALS_JSON }}
+      - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Enable required APIs (Run, Cloud Build, AR, CRM, Service Usage, IAM Creds)
+      - name: Enable APIs (idempotent)
         run: |
-          gcloud services enable \
-            run.googleapis.com \
-            cloudbuild.googleapis.com \
-            artifactregistry.googleapis.com \
-            cloudresourcemanager.googleapis.com \
-            serviceusage.googleapis.com \
-            iamcredentials.googleapis.com \
-            --project "${GCP_PROJECT_ID}" --quiet
+          gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
+            --project="${GCP_PROJECT_ID}" --quiet
 
-      - id: build
-        name: Build container image via Cloud Build (Dockerfile or Buildpacks)
-        shell: bash
+      - name: Build & Push (Cloud Build → AR)
         working-directory: services/worker
         run: |
-          set -euo pipefail
-          SERVICE="${WORKER_SERVICE}"
-          IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO}/${SERVICE}:${GIT_SHA}"
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          gcloud builds submit . \
+            --project="${GCP_PROJECT_ID}" \
+            --tag="${IMAGE}" \
+            --gcs-source-staging-dir="gs://$GCP_PROJECT_ID_cloudbuild/source" \
+            --quiet
 
-          if [[ -f Dockerfile ]]; then
-            echo 'Dockerfile found — using docker build';
-            BUILD_ID=$(gcloud builds submit . --tag "$IMAGE" --project "${GCP_PROJECT_ID}" --async --format='value(id)');
-          else
-            echo 'No Dockerfile — using buildpacks';
-            BUILD_ID=$(gcloud builds submit . --pack image="$IMAGE" --project "${GCP_PROJECT_ID}" --async --format='value(id)');
-          fi
-
-          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
-          for i in $(seq 1 120); do
-            STATUS=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(status)') || STATUS=UNKNOWN
-            if [[ "$STATUS" == "SUCCESS" ]]; then break; fi
-            if [[ "$STATUS" == "FAILURE" || "$STATUS" == "CANCELLED" || "$STATUS" == "EXPIRED" ]]; then
-              LOGURL=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(logUrl)');
-              echo "Cloud Build failed ($STATUS). Logs: $LOGURL"; exit 1;
-            fi
-            sleep 5
-          done
-          LOGURL=$(gcloud builds describe "$BUILD_ID" --project "${GCP_PROJECT_ID}" --format='value(logUrl)')
-          echo "cloudbuild_log=$LOGURL" >> "$GITHUB_OUTPUT"
-          echo "Cloud Build logs: $LOGURL"
-
-      - id: deploy
-        name: Deploy Worker from image
-        shell: bash
+      - name: Deploy to Cloud Run (from image)
         run: |
-          set -euo pipefail
-          REGION="${GCP_REGION}"
-          SERVICE="${WORKER_SERVICE}"
-          IMAGE="${{ steps.build.outputs.image }}"
-          gcloud run deploy "$SERVICE" \
-            --image="$IMAGE" \
-            --region="$REGION" \
+          gcloud run deploy "${SERVICE_NAME}" \
+            --image="${IMAGE}" \
+            --project="${GCP_PROJECT_ID}" \
+            --region="${GCP_REGION}" \
             --platform=managed \
             --service-account="${RUNTIME_SA}" \
             --allow-unauthenticated \
             --quiet
-          URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Deployed $SERVICE to $URL"
 
-      - name: "Smoke: /health CORS header (GET)"
-        shell: bash
-        run: |
-          curl -s -o /dev/null -D - -H "Origin: https://example.com" "${{ steps.deploy.outputs.url }}/health" | grep -i 'access-control-allow-origin'
+      - id: url
+        run: echo "url=$(gcloud run services describe ${SERVICE_NAME} --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke: /health CORS
+        run: curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin"
