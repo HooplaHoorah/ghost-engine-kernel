@@ -1,10 +1,10 @@
+// Worker express app with /, /health, /work
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080;
 
-app.get('/health', (_req, res) => res.type('text/plain').send('ok'));
-app.head('/health', (_req, res) => res.sendStatus(200));
+app.get('/health', (req, res) => res.status(200).json({ ok: true }));
+app.get('/', (req, res) => res.status(200).send('<h1>Ghost Engine Worker</h1><p>OK</p>'));
+app.get('/work', (req, res) => res.status(200).json({ job: 'noop', status: 'done' }));
 
-app.get('/', (_req, res) => res.type('text/plain').send('Ghost Engine Worker is running'));
-
-app.listen(port, '0.0.0.0', () => console.log(`worker listening on ${port}`));
+app.listen(PORT, () => console.log(`worker on ${PORT}`));

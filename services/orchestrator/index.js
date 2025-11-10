@@ -1,12 +1,20 @@
+// Orchestrator express app with /, /health, /call-worker
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080;
+const WORKER_URL = process.env.WORKER_URL || 'https://worker-zpwl4fwxg-uc.a.run.app';
 
-// health for GET and HEAD
-app.get('/health', (_req, res) => res.type('text/plain').send('ok'));
-app.head('/health', (_req, res) => res.sendStatus(200));
+app.get('/health', (req, res) => res.status(200).json({ ok: true }));
+app.get('/', (req, res) => res.status(200).send('<h1>Ghost Engine Orchestrator</h1><p>OK</p>'));
+app.get('/call-worker', async (req, res) => {
+  try {
+    const r = await fetch(WORKER_URL + '/work');
+    const type = r.headers.get('content-type') || '';
+    const data = type.includes('application/json') ? await r.json() : await r.text();
+    res.status(200).json({ orchestrator: 'ok', worker_url: WORKER_URL, worker_response: data });
+  } catch (e) {
+    res.status(502).json({ error: 'worker-unreachable', detail: String(e) });
+  }
+});
 
-// simple root
-app.get('/', (_req, res) => res.type('text/plain').send('Ghost Engine Orchestrator is running'));
-
-app.listen(port, '0.0.0.0', () => console.log(`orchestrator listening on ${port}`));
+app.listen(PORT, () => console.log(`orchestrator on ${PORT}`));
