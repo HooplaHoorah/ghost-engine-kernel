@@ -1,0 +1,59 @@
+name: Deploy Worker to Cloud Run
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: services/worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 474.0.0'
+
+      - name: Auth (WIF or SA key)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+        env:
+          REGION: ${{ vars.GCP_REGION }}
+
+      - name: Build & Push image
+        run: |
+          IMAGE=${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ghost-engine/worker:${GITHUB_SHA}
+          docker build -t $IMAGE -f ../../Dockerfile ../../
+          docker push $IMAGE
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+        env:
+          REGION: ${{ vars.GCP_REGION }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          IMAGE=${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ghost-engine/worker:${GITHUB_SHA}
+          gcloud run deploy "${{ vars.WORKER_SERVICE }}" \n            --image=$IMAGE \n            --region="${{ vars.GCP_REGION }}" \n            --platform=managed \n            --allow-unauthenticated \n            --service-account=cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \n            --quiet
+          URL="$(gcloud run services describe "${{ vars.WORKER_SERVICE }}" --region="${{ vars.GCP_REGION }}" --format='value(status.url)')"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+        env:
+          REGION: ${{ vars.GCP_REGION }}
+
+      - name: Shift traffic to latest revision
+        run: gcloud run services update-traffic "${{ vars.WORKER_SERVICE }}" --to-latest --region="${{ vars.GCP_REGION }}" --platform=managed --quiet
+
+      - name: Print URL
+        run: echo "WORKER_URL=${{ steps.deploy.outputs.url }}"
