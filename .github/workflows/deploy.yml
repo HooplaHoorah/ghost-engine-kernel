@@ -23,8 +23,8 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       GCP_REGION: ${{ vars.GCP_REGION }}
-      SERVICE_NAME: ${{ vars.ORCH_SERVICE }}     # e.g. "orchestrator"
-      ARTIFACT_REPO: cloud-run-source-deploy     # reuse the same repo name you were tagging before
+      SERVICE_NAME: ${{ vars.ORCH_SERVICE }}      # e.g. "orchestrator"
+      ARTIFACT_REPO: cloud-run-source-deploy
       IMAGE_NAME: orchestrator
       IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
       RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
@@ -46,21 +46,26 @@ jobs:
 
       - name: Enable APIs (idempotent)
         run: |
-          gcloud services enable artifactregistry.googleapis.com run.googleapis.com --project="${GCP_PROJECT_ID}" --quiet
+          gcloud services enable artifactregistry.googleapis.com run.googleapis.com \
+            --project="${GCP_PROJECT_ID}" --quiet
 
       - name: Ensure Artifact Registry repo exists (idempotent)
         run: |
           gcloud artifacts repositories describe "${ARTIFACT_REPO}" --location="${GCP_REGION}" \
-          || gcloud artifacts repositories create "${ARTIFACT_REPO}" --repository-format=docker --location="${GCP_REGION}" --quiet
+          || gcloud artifacts repositories create "${ARTIFACT_REPO}" \
+               --repository-format=docker --location="${GCP_REGION}" --quiet
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
 
       - name: Build image
-        run: docker build -t "${IMAGE}" services/orchestrator
+        run: |
+          docker build -t "${IMAGE}" services/orchestrator
 
       - name: Push image
-        run: docker push "${IMAGE}"
+        run: |
+          docker push "${IMAGE}"
 
       - name: Deploy to Cloud Run (from image)
         run: |
@@ -75,16 +80,26 @@ jobs:
 
       - id: url
         name: Get service URL
-        run: echo "url=$(gcloud run services describe ${SERVICE_NAME} --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+        run: |
+          set -e
+          URL="$(gcloud run services describe "${SERVICE_NAME}" \
+                 --project="${GCP_PROJECT_ID}" \
+                 --region="${GCP_REGION}" \
+                 --format='value(status.url)')"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
 
       - name: "Smoke: /health CORS"
-        run: curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin" || exit 1
+        run: |
+          curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin"
 
       - name: "Smoke: /status HTML"
-        run: curl "${{ steps.url.outputs.url }}/status" | grep -q "<html>" || exit 1
+        run: |
+          curl "${{ steps.url.outputs.url }}/status" | grep -q "<html>"
 
       - name: "Smoke: root HTML"
-        run: curl "${{ steps.url.outputs.url }}" | grep -q "<html>" || exit 1
+        run: |
+          curl "${{ steps.url.outputs.url }}" | grep -q "<html>"
 
       - name: Summarize URL
-        run: echo "Service URL: ${{ steps.url.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          printf 'Service URL: %s\n' "${{ steps.url.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
