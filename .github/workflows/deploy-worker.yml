@@ -11,7 +11,13 @@ jobs:
       id-token: write
     defaults:
       run:
+        shell: bash
         working-directory: services/worker
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      SERVICE: ${{ vars.WORKER_SERVICE }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,39 +27,42 @@ jobs:
         with:
           version: '>= 474.0.0'
 
-      - name: Auth (WIF or SA key)
-        id: auth
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Configure docker for Artifact Registry
-        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
-        env:
-          REGION: ${{ vars.GCP_REGION }}
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
       - name: Build & Push image
+        id: build
         run: |
-          IMAGE=${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ghost-engine/worker:${GITHUB_SHA}
-          docker build -t $IMAGE -f ../../Dockerfile ../../
-          docker push $IMAGE
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
-        env:
-          REGION: ${{ vars.GCP_REGION }}
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/ghost-engine/worker:${GITHUB_SHA}"
+          # use repo root as context; top-level Dockerfile
+          docker build -t "$IMAGE" -f ../../Dockerfile ../../
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloud Run
+        id: deploy
         run: |
-          IMAGE=${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ghost-engine/worker:${GITHUB_SHA}
-          gcloud run deploy "${{ vars.WORKER_SERVICE }}" \n            --image=$IMAGE \n            --region="${{ vars.GCP_REGION }}" \n            --platform=managed \n            --allow-unauthenticated \n            --service-account=cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \n            --quiet
-          URL="$(gcloud run services describe "${{ vars.WORKER_SERVICE }}" --region="${{ vars.GCP_REGION }}" --format='value(status.url)')"
-          echo "url=$URL" >> $GITHUB_OUTPUT
-        env:
-          REGION: ${{ vars.GCP_REGION }}
+          gcloud run deploy "$SERVICE" \
+            --image="${{ steps.build.outputs.image }}" \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --service-account="cloud-run-runtime@${PROJECT_ID}.iam.gserviceaccount.com" \
+            --quiet
+          URL="$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Shift traffic to latest revision
-        run: gcloud run services update-traffic "${{ vars.WORKER_SERVICE }}" --to-latest --region="${{ vars.GCP_REGION }}" --platform=managed --quiet
+        run: gcloud run services update-traffic "$SERVICE" --to-latest --region="$REGION" --platform=managed --quiet
 
-      - name: Print URL
-        run: echo "WORKER_URL=${{ steps.deploy.outputs.url }}"
+      - name: Probe /health (optional)
+        run: |
+          echo "WORKER_URL=${{ steps.deploy.outputs.url }}"
+          curl -fsS "${{ steps.deploy.outputs.url }}/health" | head -c 200 || true
