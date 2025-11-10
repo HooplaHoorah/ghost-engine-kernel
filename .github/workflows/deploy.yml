@@ -29,5 +29,7 @@ jobs:
       - name: Deploy to Cloud Run
         id: deploy
         run: gcloud run deploy "${{ vars.ORCH_SERVICE }}" --image="$IMAGE" --region="${{ vars.GCP_REGION }}" --platform=managed --allow-unauthenticated --service-account="cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" --quiet && URL="$(gcloud run services describe "${{ vars.ORCH_SERVICE }}" --region="${{ vars.GCP_REGION }}" --format='value(status.url)')" && echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: Shift traffic to latest revision
+        run: gcloud run services update-traffic "${{ vars.ORCH_SERVICE }}" --to-latest --region="${{ vars.GCP_REGION }}" --platform=managed --quiet
       - name: Summarize URL
         run: echo "ORCH_URL=${{ steps.deploy.outputs.url }}"
