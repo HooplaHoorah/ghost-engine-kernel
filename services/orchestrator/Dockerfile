@@ -1,9 +1,9 @@
-# Robust Node 20 Alpine Dockerfile (works with or without package-lock.json)
+# Node 20 Alpine, robust to missing package-lock.json
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package*.json ./ || true
-# Use npm ci if we have a lockfile, else npm install
+# Use npm ci when a lockfile exists; otherwise npm install
 RUN if [ -f package-lock.json ]; then \
       npm ci --omit=dev; \
     elif [ -f package.json ]; then \
