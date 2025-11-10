@@ -28,6 +28,6 @@ jobs:
           docker push "$IMAGE"
       - name: Deploy to Cloud Run
         id: deploy
-        run: gcloud run deploy "${{ vars.WORKER_SERVICE }}" --image="$IMAGE" --region="${{ vars.GCP_REGION }}" --platform=managed --allow-unauthenticated --service-account="cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" --quiet && URL="$(gcloud run services describe "${{ vars.WORKER_SERVICE }}" --region="${{ vars.GCP_REGION }}" --format='value(status.url)')" && echo "url=$URL" >> "$GITHUB_OUTPUT"
+        run: gcloud run deploy "${{ vars.WORKER_SERVICE }}" --image="$IMAGE" --region="${{ vars.GCP_REGION }}" --platform=managed --allow-unauthenticated --traffic=LATEST=100 --service-account="cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" --quiet && URL="$(gcloud run services describe "${{ vars.WORKER_SERVICE }}" --region="${{ vars.GCP_REGION }}" --format='value(status.url)')" && echo "url=$URL" >> "$GITHUB_OUTPUT"
       - name: Summarize URL
         run: echo "WORKER_URL=${{ steps.deploy.outputs.url }}"
