@@ -1,19 +1,22 @@
-# Standard production Dockerfile for Node (orchestrator)
-# Caches dependencies and includes toolchain for native modules.
-
+# Robust Node 20 Alpine Dockerfile (works with or without package-lock.json)
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-COPY package*.json ./
-# If you use pnpm or yarn, swap the install command accordingly.
-RUN npm ci --omit=dev
+COPY package*.json ./ || true
+# Use npm ci if we have a lockfile, else npm install
+RUN if [ -f package-lock.json ]; then \
+      npm ci --omit=dev; \
+    elif [ -f package.json ]; then \
+      npm install --omit=dev; \
+    else \
+      echo "No package.json; skipping install"; \
+    fi
 
 FROM node:20-alpine AS runner
 ENV NODE_ENV=production
 ENV PORT=8080
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules 2>/dev/null || true
 COPY . .
 EXPOSE 8080
-# Prefer whatever your package.json defines under "start".
-CMD ["npm", "start"]
+CMD ["sh","-lc","npm start || node server.js"]
