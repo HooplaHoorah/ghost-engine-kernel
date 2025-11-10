@@ -23,8 +23,10 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       GCP_REGION: ${{ vars.GCP_REGION }}
-      SERVICE_NAME: ${{ vars.WORKER_SERVICE }}
-      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/worker:${{ github.sha }}
+      SERVICE_NAME: ${{ vars.WORKER_SERVICE }}   # e.g. "worker"
+      ARTIFACT_REPO: cloud-run-source-deploy
+      IMAGE_NAME: worker
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
       RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
     steps:
@@ -44,16 +46,21 @@ jobs:
 
       - name: Enable APIs (idempotent)
         run: |
-          gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
-            --project="${GCP_PROJECT_ID}" --quiet
+          gcloud services enable artifactregistry.googleapis.com run.googleapis.com --project="${GCP_PROJECT_ID}" --quiet
 
-      - name: Build & Push (Cloud Build + AR)
-        working-directory: services/worker
+      - name: Ensure Artifact Registry repo exists (idempotent)
         run: |
-          gcloud builds submit . \
-            --project="${GCP_PROJECT_ID}" \
-            --tag="${IMAGE}" \
-            --quiet
+          gcloud artifacts repositories describe "${ARTIFACT_REPO}" --location="${GCP_REGION}" \
+          || gcloud artifacts repositories create "${ARTIFACT_REPO}" --repository-format=docker --location="${GCP_REGION}" --quiet
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: docker build -t "${IMAGE}" services/worker
+
+      - name: Push image
+        run: docker push "${IMAGE}"
 
       - name: Deploy to Cloud Run (from image)
         run: |
@@ -67,13 +74,17 @@ jobs:
             --quiet
 
       - id: url
-        run: echo "url=$(gcloud run services describe ${SERVICE_NAME} --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --format='value(status.url)'))" >> "$GITHUB_OUTPUT"
+        name: Get service URL
+        run: echo "url=$(gcloud run services describe ${SERVICE_NAME} --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --format='value(status.url)')" >> "$GITHUB_OUTPUT"
 
       - name: "Smoke: /health CORS"
-        run: curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin"
+        run: curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin" || exit 1
 
       - name: "Smoke: /status HTML"
-        run: curl "${{ steps.url.outputs.url }}/status" | grep -q "<html>"
+        run: curl "${{ steps.url.outputs.url }}/status" | grep -q "<html>" || exit 1
 
       - name: "Smoke: root HTML"
-        run: curl "${{ steps.url.outputs.url }}" | grep -q "<html>"
+        run: curl "${{ steps.url.outputs.url }}" | grep -q "<html>" || exit 1
+
+      - name: Summarize URL
+        run: echo "Service URL: ${{ steps.url.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
