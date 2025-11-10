@@ -3,7 +3,8 @@ name: Deploy Orchestrator to Cloud Run
 on:
   push:
     branches: [main]
-    paths: ['services/orchestrator/**']
+    paths:
+      - 'services/orchestrator/**'
   workflow_dispatch: {}
 
 concurrency:
@@ -27,29 +28,32 @@ jobs:
       RUNTIME_SA: cloud-run-runtime@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - id: auth
+      - name: Auth to Google Cloud (OIDC)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Enable APIs (idempotent)
         run: |
           gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
             --project="${GCP_PROJECT_ID}" --quiet
 
-      # Build the Dockerfile explicitly and push to Artifact Registry
-      - name: Build & Push (Cloud Build → AR)
+      # Build the Dockerfile explicitly and push to Artifact Registry via Cloud Build
+      - name: Build & Push (Cloud Build + AR)
         working-directory: services/orchestrator
         run: |
           gcloud builds submit . \
             --project="${GCP_PROJECT_ID}" \
             --tag="${IMAGE}" \
-            --gcs-source-staging-dir="gs://$GCP_PROJECT_ID_cloudbuild/source" \
             --quiet
 
       - name: Deploy to Cloud Run (from image)
@@ -64,10 +68,13 @@ jobs:
             --quiet
 
       - id: url
-        run: echo "url=$(gcloud run services describe ${SERVICE_NAME} --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+        run: echo "url=$(gcloud run services describe ${SERVICE_NAME} --project=${GCP_PROJECT_ID} --region=${GCP_REGION} --format='value(status.url)'))" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke: /health CORS
+      - name: "Smoke: /health CORS"
         run: curl -I "${{ steps.url.outputs.url }}/health" | grep -q "Access-Control-Allow-Origin"
 
-      - name: Smoke: /status HTML
+      - name: "Smoke: /status HTML"
         run: curl "${{ steps.url.outputs.url }}/status" | grep -q "<html>"
+
+      - name: "Smoke: root HTML"
+        run: curl "${{ steps.url.outputs.url }}" | grep -q "<html>"
