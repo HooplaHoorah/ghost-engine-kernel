@@ -1,22 +1,22 @@
-# Node 20 Alpine, robust to missing package-lock.json
+# syntax=docker/dockerfile:1
+
+# --- Build deps stage ---
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-COPY package*.json ./ || true
-# Use npm ci when a lockfile exists; otherwise npm install
-RUN if [ -f package-lock.json ]; then \
-      npm ci --omit=dev; \
-    elif [ -f package.json ]; then \
-      npm install --omit=dev; \
-    else \
-      echo "No package.json; skipping install"; \
-    fi
+# Copy manifest(s); copy lockfile only if present
+COPY package.json package-lock.json* ./
+# Install prod deps (prefer lockfile if present)
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
+# --- Runtime stage ---
 FROM node:20-alpine AS runner
 ENV NODE_ENV=production
-ENV PORT=8080
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules 2>/dev/null || true
+# Bring in node_modules from deps layer
+COPY --from=deps /app/node_modules ./node_modules
+# Copy the rest of the app
 COPY . .
 EXPOSE 8080
-CMD ["sh","-lc","npm start || node server.js"]
+# Start (fallbacks if "npm start" not defined)
+CMD ["sh","-lc","npm start || node server.js || node index.js"]
