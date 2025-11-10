@@ -1,23 +1,12 @@
 const express = require('express');
-const path = require('path');
-
 const app = express();
 const port = process.env.PORT || 8080;
 
-// basic health endpoint for Cloud Run
-app.get('/health', (req, res) => res.status(200).send('ok'));
+// health for GET and HEAD
+app.get('/health', (_req, res) => res.type('text/plain').send('ok'));
+app.head('/health', (_req, res) => res.sendStatus(200));
 
-// serve static landing if present
-const pub = path.join(__dirname, 'public');
-app.use(express.static(pub));
+// simple root
+app.get('/', (_req, res) => res.type('text/plain').send('Ghost Engine Orchestrator is running'));
 
-app.get('/', (req, res) => {
-  const index = path.join(pub, 'index.html');
-  res.sendFile(index, err => {
-    if (err) res.status(200).send('Ghost Engine Orchestrator is running');
-  });
-});
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`orchestrator listening on ${port}`);
-});
+app.listen(port, '0.0.0.0', () => console.log(`orchestrator listening on ${port}`));
