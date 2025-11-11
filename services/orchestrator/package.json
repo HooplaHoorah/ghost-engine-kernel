@@ -1,0 +1,11 @@
+{
+  "name": "ghost-orchestrator",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
