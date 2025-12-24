@@ -1,0 +1,13 @@
+flowchart TB
+  subgraph Client
+    A[Web Demo (WASM)] -->|HTTPS| CF[CloudFront]
+  end
+  CF --> S3[(S3 Assets)]
+  A --> APIGW[API Gateway]
+  APIGW --> L1[Lambda: Feature Flags/Telemetry]
+  APIGW --> ORCH[ECS/Fargate: Orchestrator]
+  ORCH --> RT[ECS/Fargate: Runtime]
+  ORCH --> WK[Worker Service]
+  ORCH --> INF[Inference (Optional)]
+  ORCH --> DB[(RDS Postgres)]
+  ORCH --> CW[(CloudWatch)]

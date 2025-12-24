@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800">
+  <rect x="0" y="0" width="1200" height="800" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+  <text x="40" y="60" font-family="Arial" font-size="36" fill="#111111">GE Landing</text>
+  <rect x="40" y="100" width="1120" height="90" fill="none" stroke="#111111" stroke-width="2"/>
+  <text x="52" y="140" font-family="Arial" font-size="22" fill="#111111">Top Nav / CTA</text>
+  <rect x="40" y="210" width="1120" height="200" fill="none" stroke="#111111" stroke-width="2"/>
+  <text x="52" y="250" font-family="Arial" font-size="22" fill="#111111">Hero + One-liner + Demo Button</text>
+  <rect x="40" y="430" width="550" height="300" fill="none" stroke="#111111" stroke-width="2"/>
+  <text x="52" y="470" font-family="Arial" font-size="22" fill="#111111">Value Props</text>
+  <rect x="610" y="430" width="550" height="300" fill="none" stroke="#111111" stroke-width="2"/>
+  <text x="622" y="470" font-family="Arial" font-size="22" fill="#111111">How It Works / Logos</text>
+</svg>

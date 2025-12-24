@@ -1,0 +1,1 @@
+Drop the 'instructions_for_antigravity' folder into your repo root. Do not commit it.

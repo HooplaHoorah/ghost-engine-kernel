@@ -1,0 +1,1 @@
+output "note" { value = "Wire outputs once modules exist." }

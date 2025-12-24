@@ -1,0 +1,14 @@
+name: CI
+on:
+  push: { branches: ["main"] }
+  pull_request: {}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: cd services/orchestrator && npm ci
+      - run: cd services/worker && npm ci
+      - run: echo "TODO: add tests + compose smoke test"
