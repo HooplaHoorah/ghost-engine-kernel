@@ -1,20 +1,54 @@
 const express = require('express');
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 8080;
-const WORKER_URL = process.env.WORKER_URL || 'https://worker-zpwl4fwxg-uc.a.run.app';
+const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8081';
 
-app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
-app.get('/', (_req, res) => res.status(200).send('<h1>Ghost Engine Orchestrator</h1><p>OK</p>'));
+app.use(express.json());
 
-app.get('/call-worker', async (_req, res) => {
+// 1. Health check
+app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
+app.get('/', (_req, res) => res.status(200).send('<h1>Ghost Engine Orchestrator</h1>'));
+
+// In-memory stub state
+const jobs = {};
+
+// 2. Generate Scene (trigger)
+app.post('/generate-scene', async (req, res) => {
+  // Stub: receive prompt, return job ID
+  const { prompt, style } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'missing prompt' });
+
+  const jobId = crypto.randomUUID();
+  jobs[jobId] = {
+    id: jobId,
+    status: 'pending',
+    prompt,
+    created_at: new Date().toISOString()
+  };
+
+  console.log(`[Job ${jobId}] Created scene generation request`);
+
+  // Dispatch to Worker
   try {
-    const r = await fetch(WORKER_URL + '/work');
-    const type = r.headers.get('content-type') || '';
-    const data = type.includes('application/json') ? await r.json() : await r.text();
-    res.status(200).json({ orchestrator: 'ok', worker_url: WORKER_URL, worker_response: data });
+    console.log(`[Job ${jobId}] Dispatching to ${WORKER_URL}/process`);
+    fetch(`${WORKER_URL}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: jobId, prompt })
+    }).catch(err => console.error(`[Job ${jobId}] Async worker dispatch failed:`, err));
   } catch (e) {
-    res.status(502).json({ error: 'worker-unreachable', detail: String(e) });
+    console.error(`[Job ${jobId}] Setup failed:`, e);
   }
+
+  res.status(202).json({ job_id: jobId, status: 'pending' });
 });
 
-app.listen(PORT, () => console.log('orchestrator on ' + PORT));
+// 3. Status check
+app.get('/status/:id', (req, res) => {
+  const job = jobs[req.params.id];
+  if (!job) return res.status(404).json({ error: 'job not found' });
+  res.json(job);
+});
+
+app.listen(PORT, () => console.log('orchestrator running on port ' + PORT));

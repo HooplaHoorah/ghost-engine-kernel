@@ -1,14 +1,14 @@
 version: "3.9"
 services:
   orchestrator:
-    build: ./services/orchestrator
+    build: ../../services/orchestrator
     environment:
       - PORT=8080
       - WORKER_URL=http://worker:8081
     ports: ["8080:8080"]
     depends_on: [worker]
   worker:
-    build: ./services/worker
+    build: ../../services/worker
     environment:
       - PORT=8081
     ports: ["8081:8081"]
