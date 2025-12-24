@@ -1,0 +1,58 @@
+name: Build and Push
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_ORCHESTRATOR: ghost-engine-orchestrator-dev
+  ECR_REPO_WORKER: ghost-engine-worker-dev
+  # Role ARN will be created by Terraform, update this manually or via secrets after apply. 
+  # For now using a placeholder or secret.
+  # Assuming the user will populate this secret or we hardcode it after TF apply.
+  ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_ARN }} 
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push Orchestrator
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd services/orchestrator
+          docker build -t $ECR_REGISTRY/$ECR_REPO_ORCHESTRATOR:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPO_ORCHESTRATOR:latest .
+          docker push $ECR_REGISTRY/$ECR_REPO_ORCHESTRATOR:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO_ORCHESTRATOR:latest
+
+      - name: Build and Push Worker
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd services/worker
+          docker build -t $ECR_REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPO_WORKER:latest .
+          docker push $ECR_REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO_WORKER:latest

@@ -14,3 +14,30 @@ module "iam_oidc" {
     module.ecr.worker_repo_arn
   ]
 }
+
+module "vpc" {
+  source       = "./modules/vpc"
+  project_name = var.project_name
+  env          = var.env
+}
+
+module "alb" {
+  source            = "./modules/alb"
+  project_name      = var.project_name
+  env               = var.env
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+}
+
+module "ecs" {
+  source                = "./modules/ecs"
+  project_name          = var.project_name
+  env                   = var.env
+  aws_region            = var.aws_region
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  alb_target_group_arn  = module.alb.target_group_arn
+  alb_security_group_id = module.alb.security_group_id
+  ecr_orchestrator_url  = module.ecr.orchestrator_repo_url
+  ecr_worker_url        = module.ecr.worker_repo_url
+}
