@@ -16,7 +16,8 @@ env:
   # Role ARN will be created by Terraform, update this manually or via secrets after apply. 
   # For now using a placeholder or secret.
   # Assuming the user will populate this secret or we hardcode it after TF apply.
-  ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_ARN }} 
+  # Role ARN provisioned by Terraform
+  ROLE_TO_ASSUME: arn:aws:iam::837801696495:role/github-actions-role 
 
 jobs:
   build-and-push:
