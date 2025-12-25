@@ -7,16 +7,23 @@ app.use(express.json());
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
 
 app.post('/process', async (req, res) => {
-    const { id, prompt } = req.body;
-    console.log(`[Worker] Received job ${id}: "${prompt}"`);
+    const { jobId, prompt } = req.body;
+    console.log(`[Worker] Received job ${jobId}: "${prompt}"`);
 
-    // Simulate work
-    setTimeout(() => {
-        console.log(`[Worker] Finished job ${id}`);
-        // In a real system, we'd update DB or callback
-    }, 2000);
+    // Simulate work (e.g., GPU inference)
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    res.status(200).json({ status: 'accepted', message: 'Work started' });
+    console.log(`[Worker] Finished job ${jobId}`);
+
+    // Return result to Orchestrator
+    res.status(200).json({
+        jobId,
+        ok: true,
+        output: {
+            image: `https://fake-cdn.com/${jobId}.png`,
+            seed: 12345
+        }
+    });
 });
 
 app.listen(PORT, () => console.log('worker running on port ' + PORT));

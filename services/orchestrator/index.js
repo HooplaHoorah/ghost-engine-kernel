@@ -15,33 +15,56 @@ const jobs = {};
 
 // 2. Generate Scene (trigger)
 app.post('/generate-scene', async (req, res) => {
-  // Stub: receive prompt, return job ID
-  const { prompt, style } = req.body;
+  const { prompt, style, seed } = req.body;
   if (!prompt) return res.status(400).json({ error: 'missing prompt' });
 
   const jobId = crypto.randomUUID();
   jobs[jobId] = {
-    id: jobId,
-    status: 'pending',
-    prompt,
-    created_at: new Date().toISOString()
+    jobId,
+    state: 'queued',
+    progress: 0,
+    result: null,
+    error: null,
+    createdAt: new Date().toISOString()
   };
 
   console.log(`[Job ${jobId}] Created scene generation request`);
 
-  // Dispatch to Worker
-  try {
-    console.log(`[Job ${jobId}] Dispatching to ${WORKER_URL}/process`);
-    fetch(`${WORKER_URL}/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: jobId, prompt })
-    }).catch(err => console.error(`[Job ${jobId}] Async worker dispatch failed:`, err));
-  } catch (e) {
-    console.error(`[Job ${jobId}] Setup failed:`, e);
-  }
+  // Dispatch to Worker (background)
+  // We don't await this for the client response
+  (async () => {
+    try {
+      jobs[jobId].state = 'running';
+      console.log(`[Job ${jobId}] Dispatching to ${WORKER_URL}/process`);
 
-  res.status(202).json({ job_id: jobId, status: 'pending' });
+      const workerRes = await fetch(`${WORKER_URL}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, prompt, style, seed })
+      });
+
+      if (!workerRes.ok) {
+        throw new Error(`Worker responded with ${workerRes.status}`);
+      }
+
+      const data = await workerRes.json();
+      // Expecting { jobId, ok: true, output: {...} }
+
+      jobs[jobId].state = 'done';
+      jobs[jobId].progress = 1.0;
+      jobs[jobId].result = data.output;
+      console.log(`[Job ${jobId}] Completed successfully`);
+    } catch (err) {
+      console.error(`[Job ${jobId}] Failed:`, err);
+      jobs[jobId].state = 'failed';
+      jobs[jobId].error = err.message;
+    }
+  })();
+
+  res.status(202).json({
+    jobId,
+    statusUrl: `/status/${jobId}`
+  });
 });
 
 // 3. Status check
