@@ -62,3 +62,32 @@ resource "aws_iam_role_policy" "ecr_push" {
     ]
   })
 }
+
+resource "aws_iam_role_policy" "ecs_deploy" {
+  name = "ecs-deploy"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:DescribeTaskDefinition",
+          "ecs:RegisterTaskDefinition",
+          "ecs:UpdateService",
+          "ecs:DescribeServices",
+          "ecs:DescribeClusters" 
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = [
+          "arn:aws:iam::*:role/${var.project_name}-*-role-${var.env}"
+        ]
+      }
+    ]
+  })
+}

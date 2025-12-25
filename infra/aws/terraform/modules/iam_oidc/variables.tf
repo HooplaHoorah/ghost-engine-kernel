@@ -13,3 +13,13 @@ variable "ecr_resource_arns" {
   type        = list(string)
   description = "List of ECR repository ARNs that the role can push to"
 }
+
+variable "project_name" {
+  type = string
+  default = "ghost-engine" # Fallback if not provided, though ideally we pass it
+}
+
+variable "env" {
+  type = string
+  default = "dev"
+}

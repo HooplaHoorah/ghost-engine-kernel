@@ -13,6 +13,8 @@ module "iam_oidc" {
     module.ecr.orchestrator_repo_arn,
     module.ecr.worker_repo_arn
   ]
+  project_name = var.project_name
+  env          = var.env
 }
 
 module "vpc" {
