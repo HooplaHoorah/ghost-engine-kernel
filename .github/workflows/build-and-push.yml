@@ -57,3 +57,26 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPO_WORKER:latest .
           docker push $ECR_REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPO_WORKER:latest
+
+      - name: Download Task Definitions
+        run: |
+          aws ecs describe-task-definition --task-definition ghost-engine-orchestrator-dev --query taskDefinition > orchestrator-td.json
+          aws ecs describe-task-definition --task-definition ghost-engine-worker-dev --query taskDefinition > worker-td.json
+
+      - name: Deploy Orchestrator
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: orchestrator-td.json
+          service: orchestrator
+          cluster: ghost-engine-cluster-dev
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_ORCHESTRATOR }}:${{ github.sha }}
+          wait-for-service-stability: true
+
+      - name: Deploy Worker
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: worker-td.json
+          service: worker
+          cluster: ghost-engine-cluster-dev
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_WORKER }}:${{ github.sha }}
+          wait-for-service-stability: true

@@ -215,6 +215,10 @@ resource "aws_ecs_service" "orchestrator" {
       }
     }
   }
+
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
 
 resource "aws_ecs_service" "worker" {
@@ -240,5 +244,9 @@ resource "aws_ecs_service" "worker" {
         dns_name = "worker"
       }
     }
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 }
