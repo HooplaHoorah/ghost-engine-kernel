@@ -7,3 +7,5 @@ variable "alb_security_group_id" { type = string }
 variable "alb_target_group_arn" { type = string }
 variable "ecr_orchestrator_url" { type = string }
 variable "ecr_worker_url" { type = string }
+variable "jobs_table_name" { type = string }
+variable "jobs_table_arn" { type = string }

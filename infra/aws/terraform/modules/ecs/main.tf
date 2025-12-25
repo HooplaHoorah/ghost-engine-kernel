@@ -27,6 +27,43 @@ resource "aws_iam_role_policy_attachment" "execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role" "task_role" {
+  name = "${var.project_name}-task-role-${var.env}"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "task_role_policy" {
+  name = "${var.project_name}-task-policy-${var.env}"
+  role = aws_iam_role.task_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+          "dynamodb:Query"
+        ]
+        Resource = [
+          var.jobs_table_arn,
+          "${var.jobs_table_arn}/index/*"
+        ]
+      }
+    ]
+  })
+}
+
 # --- Security Groups ---
 resource "aws_security_group" "orchestrator" {
   name        = "${var.project_name}-orch-sg-${var.env}"
@@ -87,6 +124,7 @@ resource "aws_ecs_task_definition" "orchestrator" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.execution_role.arn
+  task_role_arn            = aws_iam_role.task_role.arn
 
   container_definitions = jsonencode([{
     name      = "orchestrator"
@@ -99,7 +137,8 @@ resource "aws_ecs_task_definition" "orchestrator" {
     }]
     environment = [
       { name = "PORT", value = "8080" },
-      { name = "WORKER_URL", value = "http://worker:8081" } # Service Connect DNS
+      { name = "WORKER_URL", value = "http://worker:8081" },
+      { name = "JOBS_TABLE_NAME", value = var.jobs_table_name }
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -119,6 +158,7 @@ resource "aws_ecs_task_definition" "worker" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.execution_role.arn
+  task_role_arn            = aws_iam_role.task_role.arn
 
   container_definitions = jsonencode([{
     name      = "worker"
@@ -130,7 +170,8 @@ resource "aws_ecs_task_definition" "worker" {
       protocol      = "tcp"
     }]
     environment = [
-      { name = "PORT", value = "8081" }
+      { name = "PORT", value = "8081" },
+      { name = "JOBS_TABLE_NAME", value = var.jobs_table_name }
     ]
     logConfiguration = {
       logDriver = "awslogs"

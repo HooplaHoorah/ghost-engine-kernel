@@ -29,6 +29,12 @@ module "alb" {
   public_subnet_ids = module.vpc.public_subnet_ids
 }
 
+module "dynamodb" {
+  source       = "./modules/dynamodb"
+  project_name = var.project_name
+  env          = var.env
+}
+
 module "ecs" {
   source                = "./modules/ecs"
   project_name          = var.project_name
@@ -40,4 +46,8 @@ module "ecs" {
   alb_security_group_id = module.alb.security_group_id
   ecr_orchestrator_url  = module.ecr.orchestrator_repo_url
   ecr_worker_url        = module.ecr.worker_repo_url
+  
+  # Inject DynamoDB info
+  jobs_table_name       = module.dynamodb.table_name
+  jobs_table_arn        = module.dynamodb.table_arn
 }
