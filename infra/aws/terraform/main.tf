@@ -51,3 +51,13 @@ module "ecs" {
   jobs_table_name       = module.dynamodb.table_name
   jobs_table_arn        = module.dynamodb.table_arn
 }
+
+module "dashboard" {
+  source                    = "./modules/dashboard"
+  project_name              = var.project_name
+  env                       = var.env
+  aws_region                = var.aws_region
+  cluster_name              = module.ecs.cluster_name
+  orchestrator_service_name = module.ecs.orchestrator_service_name
+  worker_service_name       = module.ecs.worker_service_name
+}

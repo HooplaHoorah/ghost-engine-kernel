@@ -11,6 +11,15 @@ const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1
 const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.JOBS_TABLE_NAME;
 
+// Structured Logging Helper
+const log = (msg, context = {}) => {
+  console.log(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    message: msg,
+    ...context
+  }));
+};
+
 app.use(express.json());
 
 // 1. Health check
@@ -45,7 +54,7 @@ app.post('/generate-scene', async (req, res) => {
     } else {
       jobs[jobId] = jobState;
     }
-    console.log(`[Job ${jobId}] Created scene generation request`);
+    log(`Created scene generation request`, { traceId: jobId, persistence: !!TABLE_NAME });
   } catch (e) {
     console.error(`[Job ${jobId}] Setup failed (DDB error):`, e);
     return res.status(500).json({ error: 'internal error' });
@@ -65,7 +74,7 @@ app.post('/generate-scene', async (req, res) => {
         }));
       } else if (jobs[jobId]) jobs[jobId].state = 'running';
 
-      console.log(`[Job ${jobId}] Dispatching to ${WORKER_URL}/process`);
+      log(`Dispatching to Worker`, { traceId: jobId, target: `${WORKER_URL}/process` });
       const workerRes = await fetch(`${WORKER_URL}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,7 +98,7 @@ app.post('/generate-scene', async (req, res) => {
         jobs[jobId].progress = 1.0;
         jobs[jobId].result = data.output;
       }
-      console.log(`[Job ${jobId}] Completed successfully`);
+      log(`Completed successfully`, { traceId: jobId });
 
     } catch (err) {
       console.error(`[Job ${jobId}] Failed:`, err);
