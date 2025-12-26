@@ -1,0 +1,19 @@
+# Example workflow fragment for determinism regression
+name: determinism-test
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 9 * * *"  # daily at 09:00 UTC (adjust)
+
+jobs:
+  determinism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/backend-determinism-test.js
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}

@@ -9,3 +9,6 @@ variable "ecr_orchestrator_url" { type = string }
 variable "ecr_worker_url" { type = string }
 variable "jobs_table_name" { type = string }
 variable "jobs_table_arn" { type = string }
+variable "artifacts_bucket_name" { type = string }
+variable "artifacts_bucket_arn" { type = string }
+variable "internal_token_arn" { type = string }

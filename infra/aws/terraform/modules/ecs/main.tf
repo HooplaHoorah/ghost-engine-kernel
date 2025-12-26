@@ -27,6 +27,19 @@ resource "aws_iam_role_policy_attachment" "execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "execution_ssm_policy" {
+  name = "${var.project_name}-execution-ssm-${var.env}"
+  role = aws_iam_role.execution_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = ["ssm:GetParameters", "ssm:GetParameter"]
+      Effect   = "Allow"
+      Resource = [var.internal_token_arn]
+    }]
+  })
+}
+
 resource "aws_iam_role" "task_role" {
   name = "${var.project_name}-task-role-${var.env}"
   assume_role_policy = jsonencode({
@@ -53,11 +66,15 @@ resource "aws_iam_role_policy" "task_role_policy" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
           "dynamodb:Scan",
-          "dynamodb:Query"
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "s3:PutObject",
+          "s3:GetObject"
         ]
         Resource = [
           var.jobs_table_arn,
-          "${var.jobs_table_arn}/index/*"
+          "${var.jobs_table_arn}/index/*",
+          "${var.artifacts_bucket_arn}/jobs/*"
         ]
       }
     ]
@@ -138,7 +155,13 @@ resource "aws_ecs_task_definition" "orchestrator" {
     environment = [
       { name = "PORT", value = "8080" },
       { name = "WORKER_URL", value = "http://worker:8081" },
-      { name = "JOBS_TABLE_NAME", value = var.jobs_table_name }
+      { name = "JOBS_TABLE_NAME", value = var.jobs_table_name },
+      { name = "ARTIFACTS_BUCKET", value = var.artifacts_bucket_name },
+      { name = "ENGINE_PLUGIN", value = "stub" },
+      { name = "SELF_URL", value = "http://orchestrator:8080" }
+    ]
+    secrets = [
+      { name = "INTERNAL_TOKEN", valueFrom = var.internal_token_arn }
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -171,7 +194,12 @@ resource "aws_ecs_task_definition" "worker" {
     }]
     environment = [
       { name = "PORT", value = "8081" },
-      { name = "JOBS_TABLE_NAME", value = var.jobs_table_name }
+      { name = "JOBS_TABLE_NAME", value = var.jobs_table_name },
+      { name = "ARTIFACTS_BUCKET", value = var.artifacts_bucket_name },
+      { name = "ENGINE_PLUGIN", value = "stub" }
+    ]
+    secrets = [
+      { name = "INTERNAL_TOKEN", valueFrom = var.internal_token_arn }
     ]
     logConfiguration = {
       logDriver = "awslogs"

@@ -5,10 +5,13 @@ services:
     environment:
       - PORT=8080
       - WORKER_URL=http://worker:8081
-    ports: ["8080:8080"]
-    depends_on: [worker]
+      - SELF_URL=http://orchestrator:8080
+      - INTERNAL_TOKEN=supersecret123
+    ports: [ "8080:8080" ]
+    depends_on: [ worker ]
   worker:
     build: ../../services/worker
     environment:
       - PORT=8081
-    ports: ["8081:8081"]
+      - INTERNAL_TOKEN=supersecret123
+    ports: [ "8081:8081" ]

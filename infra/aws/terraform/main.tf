@@ -37,6 +37,12 @@ module "dynamodb" {
   env          = var.env
 }
 
+module "s3_artifacts" {
+  source       = "./modules/s3"
+  project_name = var.project_name
+  env          = var.env
+}
+
 module "ecs" {
   source                = "./modules/ecs"
   project_name          = var.project_name
@@ -52,6 +58,15 @@ module "ecs" {
   # Inject DynamoDB info
   jobs_table_name       = module.dynamodb.table_name
   jobs_table_arn        = module.dynamodb.table_arn
+  artifacts_bucket_name = module.s3_artifacts.bucket_name
+  artifacts_bucket_arn  = module.s3_artifacts.bucket_arn
+  internal_token_arn    = module.secrets.internal_token_arn
+}
+
+module "secrets" {
+  source       = "./modules/secrets"
+  project_name = var.project_name
+  env          = var.env
 }
 
 module "dashboard" {

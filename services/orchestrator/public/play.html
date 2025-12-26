@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>GE DOOM — Play</title>
+    <style>
+        body {
+            font-family: ui-sans-serif, system-ui;
+            margin: 16px;
+            background: #111;
+            color: #eee;
+        }
+
+        .bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        #view {
+            border: 1px solid #444;
+            padding: 12px;
+            min-height: 240px;
+            white-space: pre;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: #000;
+            color: #0f0;
+            line-height: 1.1;
+            font-size: 14px;
+        }
+
+        .muted {
+            color: #888;
+        }
+
+        button {
+            padding: 8px 10px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        a {
+            color: #5af;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bar">
+        <strong>GE DOOM — Web MVP</strong>
+        <span class="muted">Job:</span> <span id="job">—</span>
+        <span class="muted">Seed:</span> <span id="seed">—</span>
+        <span class="muted">Hash:</span> <span id="hash">—</span>
+        <button id="retry" style="display:none;">Retry</button>
+        <button id="proxy" style="display:none;">Load via Proxy</button>
+    </div>
+
+    <div class="muted" id="status">Loading…</div>
+    <pre id="view"></pre>
+    <div class="muted" style="margin-top: 10px;">Controls: W/A/S/D to move.</div>
+
+    <script type="module" src="/play.js"></script>
+</body>
+
+</html>

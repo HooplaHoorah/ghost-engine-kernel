@@ -1,0 +1,184 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://ghost-engine.local/schemas/levelspec.v0.schema.json",
+    "title": "Ghost Engine LevelSpec v0",
+    "type": "object",
+    "required": [
+        "version",
+        "seed",
+        "units",
+        "tiles",
+        "rooms",
+        "connections",
+        "entities",
+        "spawn",
+        "exit"
+    ],
+    "properties": {
+        "version": {
+            "type": "string",
+            "const": "0"
+        },
+        "seed": {
+            "type": "integer"
+        },
+        "units": {
+            "type": "string",
+            "const": "tile"
+        },
+        "tiles": {
+            "type": "object",
+            "required": [
+                "size"
+            ],
+            "properties": {
+                "size": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "additionalProperties": true
+        },
+        "rooms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "x",
+                    "y",
+                    "w",
+                    "h"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "x": {
+                        "type": "integer"
+                    },
+                    "y": {
+                        "type": "integer"
+                    },
+                    "w": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "h": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "theme": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": true
+            }
+        },
+        "connections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "type"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string"
+                    },
+                    "to": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "locked": {
+                        "type": "boolean"
+                    },
+                    "keyId": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": true
+            }
+        },
+        "entities": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "type",
+                    "roomId",
+                    "x",
+                    "y"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "subtype": {
+                        "type": "string"
+                    },
+                    "roomId": {
+                        "type": "string"
+                    },
+                    "x": {
+                        "type": "integer"
+                    },
+                    "y": {
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": true
+            }
+        },
+        "spawn": {
+            "type": "object",
+            "required": [
+                "roomId",
+                "x",
+                "y"
+            ],
+            "properties": {
+                "roomId": {
+                    "type": "string"
+                },
+                "x": {
+                    "type": "integer"
+                },
+                "y": {
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": true
+        },
+        "exit": {
+            "type": "object",
+            "required": [
+                "roomId",
+                "x",
+                "y"
+            ],
+            "properties": {
+                "roomId": {
+                    "type": "string"
+                },
+                "x": {
+                    "type": "integer"
+                },
+                "y": {
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": true
+        }
+    },
+    "additionalProperties": true
+}
