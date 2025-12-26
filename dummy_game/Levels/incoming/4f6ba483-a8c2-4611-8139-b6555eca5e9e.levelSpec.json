@@ -1,0 +1,106 @@
+{
+  "version": "0",
+  "seed": 662612,
+  "units": "tile",
+  "tiles": {
+    "size": 64
+  },
+  "rooms": [
+    {
+      "id": "R1",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 4,
+      "theme": "generic"
+    },
+    {
+      "id": "R2",
+      "x": 8,
+      "y": 0,
+      "w": 6,
+      "h": 4,
+      "theme": "generic"
+    },
+    {
+      "id": "R3",
+      "x": 16,
+      "y": 0,
+      "w": 6,
+      "h": 4,
+      "theme": "generic"
+    },
+    {
+      "id": "R4",
+      "x": 24,
+      "y": 0,
+      "w": 6,
+      "h": 4,
+      "theme": "generic"
+    }
+  ],
+  "connections": [
+    {
+      "from": "R1",
+      "to": "R2",
+      "type": "door",
+      "locked": false
+    },
+    {
+      "from": "R2",
+      "to": "R3",
+      "type": "door",
+      "locked": false
+    },
+    {
+      "from": "R2",
+      "to": "R4",
+      "type": "door",
+      "locked": true,
+      "keyId": "k1"
+    }
+  ],
+  "entities": [
+    {
+      "id": "k1",
+      "type": "key",
+      "roomId": "R1",
+      "x": 5,
+      "y": 2
+    },
+    {
+      "id": "E1",
+      "type": "enemy",
+      "subtype": "imp",
+      "roomId": "R2",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "id": "E2",
+      "type": "enemy",
+      "subtype": "imp",
+      "roomId": "R3",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "id": "I1",
+      "type": "item",
+      "subtype": "health_potion",
+      "roomId": "R3",
+      "x": 4,
+      "y": 2
+    }
+  ],
+  "spawn": {
+    "roomId": "R1",
+    "x": 1,
+    "y": 1
+  },
+  "exit": {
+    "roomId": "R4",
+    "x": 1,
+    "y": 1
+  }
+}

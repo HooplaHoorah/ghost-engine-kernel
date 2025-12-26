@@ -1,0 +1,96 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Ghost Engine API",
+    "version": "1.0.0",
+    "description": "Orchestrator API for generating level stubs"
+  },
+  "paths": {
+    "/generate-scene": {
+      "post": {
+        "summary": "Start a scene generation job",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": { "type": "string" },
+                  "plugin": { "type": "string", "default": "stub" },
+                  "params": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Job queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": { "type": "string" },
+                    "statusUrl": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status/{jobId}": {
+      "get": {
+        "summary": "Get job status",
+        "parameters": [
+          { "name": "jobId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status and result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": { "type": "string" },
+                    "state": { "type": "string" },
+                    "steps": { "type": "array" },
+                    "result": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "summary": "List recent jobs",
+        "responses": {
+          "200": {
+            "description": "List of recent jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "jobId": { "type": "string" },
+                      "state": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+name: determinism-test
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 9 * * *" # daily 09:00 UTC
+jobs:
+  determinism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run determinism regression
+        run: node scripts/backend-determinism-test.js
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}

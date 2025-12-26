@@ -1,0 +1,24 @@
+name: demo-readiness-report
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Run readiness report
+        run: node scripts/demo-readiness-report.js | tee readiness-report.txt
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      - name: Upload report log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readiness-report
+          path: readiness-report.txt
