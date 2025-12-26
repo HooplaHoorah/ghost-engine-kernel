@@ -534,6 +534,46 @@ app.get('/demo', (req, res) => {
   res.sendFile(__dirname + '/public/demo/index.html');
 });
 
+// 2e. Play Page
+app.get('/play', (req, res) => {
+  res.sendFile(__dirname + '/public/play.html');
+});
+app.get('/play.js', (req, res) => {
+  res.sendFile(__dirname + '/public/play.js');
+});
+
+// 2f. Artifact Proxy (CORS workaround)
+app.get('/artifact/:jobId/levelSpec', async (req, res) => {
+  const { jobId } = req.params;
+
+  // 1. Lookup Job
+  let job;
+  if (TABLE_NAME) {
+    const { Item } = await docClient.send(new GetCommand({ TableName: TABLE_NAME, Key: { jobId } }));
+    job = Item;
+  } else {
+    job = jobs[jobId];
+  }
+
+  if (!job || !job.result) return res.status(404).json({ error: "Job or result not found" });
+
+  const key = job.result.levelSpecS3Key;
+  if (!key) return res.status(404).json({ error: "LevelSpec key not found" });
+
+  // 2. Stream from S3
+  try {
+    const command = new GetObjectCommand({ Bucket: ARTIFACTS_BUCKET, Key: key });
+    const s3Res = await s3Client.send(command);
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    s3Res.Body.pipe(res);
+  } catch (e) {
+    console.error("Proxy fetch failed", e);
+    res.status(500).json({ error: "Upstream fetch failed" });
+  }
+});
+
 // 3. Status check
 // 3. Status check
 app.get('/status/:id', async (req, res) => {

@@ -1,0 +1,42 @@
+{
+  "alb_dns_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ghost-engine-alb-dev-2011300099.us-east-1.elb.amazonaws.com"
+  },
+  "aws_region": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1"
+  },
+  "ecr_orchestrator_repo_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "837801696495.dkr.ecr.us-east-1.amazonaws.com/ghost-engine-orchestrator-dev"
+  },
+  "ecr_worker_repo_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "837801696495.dkr.ecr.us-east-1.amazonaws.com/ghost-engine-worker-dev"
+  },
+  "ecs_cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ghost-engine-cluster-dev"
+  },
+  "github_actions_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::837801696495:role/github-actions-role"
+  },
+  "orchestrator_service_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "orchestrator"
+  },
+  "worker_service_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "worker"
+  }
+}

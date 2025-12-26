@@ -96,17 +96,27 @@ function updateMeta(status) {
     await replayJob(status.jobId || status.id);
   };
 
-  // Play Button
-  const playBtn = $("play");
+  // Play Buttons
+  const playCliBtn = $("play-cli");
+  const playBrowserBtn = $("play-browser");
+
   if (status.result?.levelSpecUrl) {
-    playBtn.style.display = "inline-block";
-    playBtn.onclick = () => {
+    playCliBtn.style.display = "inline-block";
+    playCliBtn.onclick = () => {
       const cmd = `curl -L "${status.result.levelSpecUrl}" -o level.json && node ge-doom/runtime.js --levelSpec level.json`;
-      // prompt to allow copy-paste
       prompt("Run this in your terminal to play (Mac/Linux):", cmd);
     };
   } else {
-    playBtn.style.display = "none";
+    playCliBtn.style.display = "none";
+  }
+
+  if (status.result?.levelSpecUrl || status.result?.levelSpec) {
+    playBrowserBtn.style.display = "inline-block";
+    playBrowserBtn.onclick = () => {
+      window.open(`/play?job=${status.jobId || status.id}`, '_blank');
+    };
+  } else {
+    playBrowserBtn.style.display = "none";
   }
 }
 
