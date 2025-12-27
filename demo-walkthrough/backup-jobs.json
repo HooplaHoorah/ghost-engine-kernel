@@ -1,0 +1,20 @@
+[
+    {
+        "desc": "doom-bridge: tiny test dungeon with a key and locked exit",
+        "jobId": "ed0f66d4-16cb-49ec-a05e-2d25e3d86a1f",
+        "links": {
+            "demo": "https://d3a3b2mntnsxvl.cloudfront.net/demo?jobId=ed0f66d4-16cb-49ec-a05e-2d25e3d86a1f",
+            "play": "https://d3a3b2mntnsxvl.cloudfront.net/play?job=ed0f66d4-16cb-49ec-a05e-2d25e3d86a1f"
+        },
+        "date": "2025-12-27"
+    },
+    {
+        "desc": "doom-bridge: tiny test dungeon with a key and locked exit",
+        "jobId": "7a0a96c8-fa1d-46cf-a6ee-4498d4058d55",
+        "links": {
+            "demo": "https://d3a3b2mntnsxvl.cloudfront.net/demo?jobId=7a0a96c8-fa1d-46cf-a6ee-4498d4058d55",
+            "play": "https://d3a3b2mntnsxvl.cloudfront.net/play?job=7a0a96c8-fa1d-46cf-a6ee-4498d4058d55"
+        },
+        "date": "2025-12-27"
+    }
+]
