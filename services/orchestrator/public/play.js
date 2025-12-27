@@ -298,19 +298,27 @@ async function main() {
     try {
         await loadGame(levelUrl);
     } catch (e) {
-        console.error(e);
-        $("status").textContent = "Could not fetch LevelSpec (possible CORS). Try proxy.";
-        $("retry").style.display = "inline-block";
-        $("proxy").style.display = "inline-block";
+        console.warn("Direct fetch failed, falling back to proxy:", e);
+        $("status").textContent = "Direct fetch blocked; using proxy…";
 
-        $("retry").onclick = () => location.reload();
-        $("proxy").onclick = async () => {
-            $("status").textContent = "Loading via proxy…";
+        try {
             await loadGame(`/artifact/${encodeURIComponent(jobId)}/levelSpec`);
-            $("status").textContent = "Playing (via proxy)";
-            $("proxy").style.display = "none";
-            $("retry").style.display = "none";
-        };
+            $("status").textContent = "Loaded via proxy.";
+        } catch (proxyErr) {
+            console.error(proxyErr);
+            $("status").textContent = "Could not fetch LevelSpec (proxy failed).";
+            $("retry").style.display = "inline-block";
+            $("proxy").style.display = "inline-block";
+
+            $("retry").onclick = () => location.reload();
+            $("proxy").onclick = async () => {
+                $("status").textContent = "Loading via proxy…";
+                await loadGame(`/artifact/${encodeURIComponent(jobId)}/levelSpec`);
+                $("status").textContent = "Playing (via proxy)";
+                $("proxy").style.display = "none";
+                $("retry").style.display = "none";
+            };
+        }
     }
 }
 
