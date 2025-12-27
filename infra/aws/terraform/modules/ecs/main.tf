@@ -67,17 +67,28 @@ resource "aws_iam_role_policy" "task_role_policy" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
           "dynamodb:Scan",
-          "dynamodb:Scan",
-          "dynamodb:Query",
-          "s3:ListBucket",
-          "s3:PutObject",
-          "s3:GetObject"
+          "dynamodb:Query"
         ]
         Resource = [
           var.jobs_table_arn,
-          "${var.jobs_table_arn}/index/*",
-          "${var.artifacts_bucket_arn}/jobs/*"
+          "${var.jobs_table_arn}/index/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+        Resource = [var.artifacts_bucket_arn]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject"
+        ]
+        Resource = ["${var.artifacts_bucket_arn}/*"]
       }
     ]
   })
@@ -102,6 +113,15 @@ resource "aws_security_group" "orchestrator" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+resource "aws_security_group_rule" "worker_to_orchestrator" {
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.orchestrator.id
+  source_security_group_id = aws_security_group.worker.id
 }
 
 resource "aws_security_group" "worker" {
