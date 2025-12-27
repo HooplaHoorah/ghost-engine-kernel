@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit'); // Add rate limit
 const app = express();
+app.set('trust proxy', 1); // Trust ALB
 const PORT = process.env.PORT || 8080;
 const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8081';
 
@@ -47,7 +48,11 @@ const checkConcurrency = async (req, res, next) => {
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const docClient = DynamoDBDocumentClient.from(client);
+const docClient = DynamoDBDocumentClient.from(client, {
+  marshallOptions: {
+    removeUndefinedValues: true
+  }
+});
 const TABLE_NAME = process.env.JOBS_TABLE_NAME;
 
 // AWS S3 (Presigning)
