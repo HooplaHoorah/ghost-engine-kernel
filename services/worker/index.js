@@ -181,7 +181,7 @@ app.post('/process', async (req, res) => {
         // Step 3: Compose Scene Graph
         const sceneGraph = await runStep('compose_scene_graph', async () => {
             await sleep(600);
-            // Create dummy scene graph
+            // Create dummy scene graph with spatial layout for play.js
             const sg = {
                 meta: {
                     seed: params?.seed || seed || 123,
@@ -190,18 +190,29 @@ app.post('/process', async (req, res) => {
                     size: params?.size || 'medium'
                 },
                 rooms: [
-                    { id: 'R1', name: 'Entrance', tags: ['start'], connections: ['R2'] },
-                    { id: 'R2', name: 'Corridor', tags: [], connections: ['R1', 'R3', 'R4'] },
-                    { id: 'R3', name: 'Chamber', tags: ['loot'], connections: ['R2'] },
-                    { id: 'R4', name: 'Boss Room', tags: ['boss'], connections: ['R2'] }
+                    { id: 'R1', name: 'Entrance', x: 0, y: 0, w: 5, h: 5 },
+                    { id: 'R2', name: 'Corridor', x: 5, y: 1, w: 6, h: 3 }, // Adjacent to R1
+                    { id: 'R3', name: 'Chamber', x: 11, y: 0, w: 5, h: 6 }, // Right of R2
+                    { id: 'R4', name: 'Boss Room', x: 2, y: 5, w: 6, h: 6 }  // Below R1
                 ],
+                connections: [
+                    { from: 'R1', to: 'R2' },
+                    { from: 'R2', to: 'R3' },
+                    { from: 'R2', to: 'R4' } // Not spatially adjacent in simple grid, but we'll assume door
+                    // Actually play.js needs adjacency logic or explicit corridors. 
+                    // Let's ensure strict adjacency for MVP:
+                    // R1(0,0 5x5) ends at x=5. R2(5,1 6x3) starts at x=5. Overlap y=1..4. Good.
+                    // R2(5,1 6x3) ends at x=11. R3(11,0 5x6) starts at x=11. Overlap y=1..4. Good.
+                    // R4(2,5 6x6) starts at y=5. R1 ends at y=5. Overlap x=2..5. Good.
+                ],
+                // play.js expects 'connections' array of {from, to}
                 entities: [
-                    { id: 'E1', type: assets.enemies[0], roomId: 'R2', props: { aggressive: true } },
-                    { id: 'E2', type: assets.enemies[1], roomId: 'R3', props: { hidden: true } }
+                    { type: assets.enemies[0], x: 6, y: 2 }, // In R2
+                    { type: assets.enemies[1], x: 12, y: 2 }, // In R3
+                    { type: 'key', x: 13, y: 4 } // Key in R3
                 ],
-                items: [
-                    { id: 'I1', type: 'health_potion', roomId: 'R3' }
-                ]
+                spawn: { x: 2, y: 2 }, // In R1
+                exit: { x: 4, y: 7 }   // In R4
             };
             return { summary: `Built graph with ${sg.rooms.length} rooms`, data: sg };
         }, {}, callbackUrl, jobId);

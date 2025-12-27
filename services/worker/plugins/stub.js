@@ -8,6 +8,7 @@ module.exports = {
 
         return {
             sceneGraph,
+            levelSpec: sceneGraph, // Reuse sceneGraph as LevelSpec for stub
             asciiMinimap
         };
     }
