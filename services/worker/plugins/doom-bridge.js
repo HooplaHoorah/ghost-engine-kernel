@@ -49,47 +49,48 @@ module.exports = {
         // 3. Connections
         const connections = [];
         const entities = [];
-        // We need to infer connections from sceneGraph.rooms[].connections
-        // This is often an adjacency list.
-        // Spec example: { "from": "r1", "to": "r2", "type": "door", "locked": true, "keyId": "k1" }
-
-        // To avoid duplicates (R1->R2 vs R2->R1), we can sort IDs
         const processedEdges = new Set();
 
-        sceneGraph.rooms.forEach(room => {
-            if (!room.connections) return;
-            room.connections.forEach(targetId => {
-                const [u, v] = [room.id, targetId].sort();
-                const edgeKey = `${u}-${v}`;
-                if (processedEdges.has(edgeKey)) return;
-                processedEdges.add(edgeKey);
+        const addConnection = (u, v, type = 'door') => {
+            const [nodeU, nodeV] = [u, v].sort();
+            const edgeKey = `${nodeU}-${nodeV}`;
+            if (processedEdges.has(edgeKey)) return;
+            processedEdges.add(edgeKey);
 
-                // For Slice 6, let's make the door to the last room (Exit) locked if possible
-                const isExitDoor = (v === sceneGraph.rooms[sceneGraph.rooms.length - 1].id);
-                const locked = isExitDoor && sceneGraph.rooms.length > 2;
+            const isExitDoor = (nodeV === sceneGraph.rooms[sceneGraph.rooms.length - 1].id);
+            const locked = isExitDoor && sceneGraph.rooms.length > 2;
 
-                connections.push({
-                    from: u,
-                    to: v,
-                    type: 'door',
-                    locked: locked,
-                    keyId: locked ? 'k1' : undefined
-                });
-
-                // If it's a locked door, we need a key entity in a different room
-                if (locked) {
-                    // We'll place a key in room 0 (Spawn) for simplicity or room 1
-                    const keyRoomId = sceneGraph.rooms[0].id;
-                    entities.push({
-                        id: 'k1',
-                        type: 'key',
-                        roomId: keyRoomId,
-                        x: 5, // absolute or relative? Mapping rules say absolute preferred
-                        y: 2
-                    });
-                }
+            connections.push({
+                from: nodeU,
+                to: nodeV,
+                type: type,
+                locked: locked,
+                keyId: locked ? 'k1' : undefined
             });
+
+            if (locked && !entities.find(e => e.id === 'k1')) {
+                const keyRoomId = sceneGraph.rooms[0].id;
+                entities.push({
+                    id: 'k1',
+                    type: 'key',
+                    roomId: keyRoomId,
+                    x: 5,
+                    y: 2
+                });
+            }
+        };
+
+        // Handle per-room adjacency
+        sceneGraph.rooms.forEach(room => {
+            if (room.connections) {
+                room.connections.forEach(targetId => addConnection(room.id, targetId));
+            }
         });
+
+        // Handle flat connections list
+        if (sceneGraph.connections) {
+            sceneGraph.connections.forEach(conn => addConnection(conn.from, conn.to, conn.type));
+        }
 
         // 4. Entities & Items
         if (sceneGraph.entities) {

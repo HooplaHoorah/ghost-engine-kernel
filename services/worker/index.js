@@ -205,11 +205,10 @@ app.post('/process', async (req, res) => {
                     // R2(5,1 6x3) ends at x=11. R3(11,0 5x6) starts at x=11. Overlap y=1..4. Good.
                     // R4(2,5 6x6) starts at y=5. R1 ends at y=5. Overlap x=2..5. Good.
                 ],
-                // play.js expects 'connections' array of {from, to}
                 entities: [
-                    { type: assets.enemies[0], x: 6, y: 2 }, // In R2
-                    { type: assets.enemies[1], x: 12, y: 2 }, // In R3
-                    { type: 'key', x: 13, y: 4 } // Key in R3
+                    { id: 'E1', type: assets.enemies[0], x: 6, y: 2, roomId: 'R2', props: { archetype: assets.enemies[0] } }, // In R2
+                    { id: 'E2', type: assets.enemies[1], x: 12, y: 2, roomId: 'R3', props: { archetype: assets.enemies[1] } }, // In R3
+                    { id: 'K1', type: 'key', x: 13, y: 4, roomId: 'R3', props: { type: 'red-key' } } // Key in R3
                 ],
                 spawn: { x: 2, y: 2 }, // In R1
                 exit: { x: 4, y: 7 }   // In R4
