@@ -61,6 +61,7 @@ resource "aws_iam_role_policy" "task_role_policy" {
       {
         Effect = "Allow"
         Action = [
+          "dynamodb:DescribeTable",
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:UpdateItem",
@@ -68,6 +69,7 @@ resource "aws_iam_role_policy" "task_role_policy" {
           "dynamodb:Scan",
           "dynamodb:Scan",
           "dynamodb:Query",
+          "s3:ListBucket",
           "s3:PutObject",
           "s3:GetObject"
         ]

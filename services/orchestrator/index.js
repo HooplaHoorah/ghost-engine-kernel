@@ -170,7 +170,7 @@ app.post('/generate-scene', checkConcurrency, async (req, res) => {
     plugin: plugin || 'stub',
     promptPreview: prompt.length > 60 ? prompt.substring(0, 60) + '...' : prompt,
     steps: [],
-    stepIds: new Set(),
+    // stepIds: new Set(),
     gsi1pk: 'JOB',
     gsi1sk: `${new Date().toISOString()}#${jobId}`,
     ttl: Math.floor(Date.now() / 1000) + (14 * 24 * 60 * 60), // 14 days

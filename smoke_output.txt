@@ -1,0 +1,7 @@
+External smoke against: http://ghost-engine-alb-dev-2011300099.us-east-1.elb.amazonaws.com
+Γ£à /healthz
+Γ£à /openapi.json
+Γ£à /demo
+Γ£à /play
+Γ£à /play.js
+Γ¥î /generate-scene failed: 500 {"error":"internal error"}

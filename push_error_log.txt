@@ -1,0 +1,7 @@
+remote: error: Trace: b85199706144a882d88553d926f91b4643a04886224ae9935c1f71f3a68bc8cd        
+remote: error: See https://gh.io/lfs for more information.        
+remote: error: File GE_build_v2.zip is 173.20 MB; this exceeds GitHub's file size limit of 100.00 MB        
+remote: error: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com.        
+To https://github.com/HooplaHoorah/ghost-engine-kernel
+ ! [remote rejected] main -> main (pre-receive hook declined)
+error: failed to push some refs to 'https://github.com/HooplaHoorah/ghost-engine-kernel'

@@ -1,0 +1,106 @@
+{
+    "events": [
+        {
+            "timestamp": 1766803693453,
+            "message": "    at convertToAttr (/app/node_modules/@aws-sdk/util-dynamodb/dist-cjs/index.js:52:16)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at Object.marshall (/app/node_modules/@aws-sdk/util-dynamodb/dist-cjs/index.js:278:28)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at marshallFunc (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:81:55)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at processObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:16:20)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at /app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:73:32",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at Array.reduce (<anonymous>)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at processAllKeysInObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:69:32)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at processObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:27:24)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803693453,
+            "message": "    at processKeysInObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:58:32)",
+            "ingestionTime": 1766803697855
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "[Job 24321781-9263-4dc8-b5c6-acd6e5e51c6f] Setup failed: Error: Pass a non-empty set, or options.convertEmptyValues=true.",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at convertToSetAttr (/app/node_modules/@aws-sdk/util-dynamodb/dist-cjs/index.js:105:15)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at convertToAttr (/app/node_modules/@aws-sdk/util-dynamodb/dist-cjs/index.js:52:16)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at Object.marshall (/app/node_modules/@aws-sdk/util-dynamodb/dist-cjs/index.js:278:28)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at marshallFunc (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:81:55)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at processObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:16:20)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at /app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:73:32",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at Array.reduce (<anonymous>)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at processAllKeysInObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:69:32)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at processObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:27:24)",
+            "ingestionTime": 1766803732952
+        },
+        {
+            "timestamp": 1766803729282,
+            "message": "    at processKeysInObj (/app/node_modules/@aws-sdk/lib-dynamodb/dist-cjs/index.js:58:32)",
+            "ingestionTime": 1766803732952
+        }
+    ],
+    "nextForwardToken": "f/39401039782531560435280572207679192853620766157887569930/s",
+    "nextBackwardToken": "b/39401038983518160717126875627166182612245894627433906187/s"
+}
