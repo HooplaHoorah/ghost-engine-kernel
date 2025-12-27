@@ -1,0 +1,108 @@
+[0m[1mmodule.secrets.random_password.internal_token: Refreshing state... [id=none][0m
+[0m[1mmodule.iam_oidc.aws_iam_openid_connect_provider.github: Refreshing state... [id=arn:aws:iam::837801696495:oidc-provider/token.actions.githubusercontent.com][0m
+[0m[1mmodule.ecs.aws_ecs_cluster.main: Refreshing state... [id=arn:aws:ecs:us-east-1:837801696495:cluster/ghost-engine-cluster-dev][0m
+[0m[1mmodule.ecr.aws_ecr_repository.orchestrator: Refreshing state... [id=ghost-engine-orchestrator-dev][0m
+[0m[1mmodule.ecr.aws_ecr_repository.worker: Refreshing state... [id=ghost-engine-worker-dev][0m
+[0m[1mmodule.ecs.aws_iam_role.task_role: Refreshing state... [id=ghost-engine-task-role-dev][0m
+[0m[1mmodule.vpc.aws_eip.nat: Refreshing state... [id=eipalloc-0450402c49fde09dc][0m
+[0m[1mmodule.vpc.aws_vpc.main: Refreshing state... [id=vpc-029a1f96027595441][0m
+[0m[1mmodule.secrets.aws_ssm_parameter.internal_token: Refreshing state... [id=/ghost-engine/dev/internal_token][0m
+[0m[1mmodule.dynamodb.aws_dynamodb_table.jobs: Refreshing state... [id=ghost-engine-jobs-dev][0m
+[0m[1mmodule.s3_artifacts.aws_s3_bucket.artifacts: Refreshing state... [id=ghost-engine-artifacts-dev][0m
+[0m[1mmodule.ecs.aws_cloudwatch_log_group.worker: Refreshing state... [id=/ecs/ghost-engine-worker-dev][0m
+[0m[1mmodule.ecs.aws_cloudwatch_log_group.orchestrator: Refreshing state... [id=/ecs/ghost-engine-orchestrator-dev][0m
+[0m[1mmodule.ecs.aws_iam_role.execution_role: Refreshing state... [id=ghost-engine-execution-role-dev][0m
+[0m[1mmodule.iam_oidc.aws_iam_role.github_actions: Refreshing state... [id=github-actions-role][0m
+[0m[1mmodule.ecs.aws_iam_role_policy_attachment.execution_role_policy: Refreshing state... [id=ghost-engine-execution-role-dev/arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy][0m
+[0m[1mmodule.ecs.aws_iam_role_policy.execution_ssm_policy: Refreshing state... [id=ghost-engine-execution-role-dev:ghost-engine-execution-ssm-dev][0m
+[0m[1mmodule.iam_oidc.aws_iam_role_policy.ecr_push: Refreshing state... [id=github-actions-role:ecr-push][0m
+[0m[1mmodule.iam_oidc.aws_iam_role_policy.ecs_deploy: Refreshing state... [id=github-actions-role:ecs-deploy][0m
+[0m[1mmodule.vpc.aws_internet_gateway.main: Refreshing state... [id=igw-0a6e4a224abd014d3][0m
+[0m[1mmodule.vpc.aws_subnet.private[1]: Refreshing state... [id=subnet-07fdf63e21cc90713][0m
+[0m[1mmodule.vpc.aws_subnet.public[1]: Refreshing state... [id=subnet-0aa05bfe16ee2fffb][0m
+[0m[1mmodule.vpc.aws_subnet.public[0]: Refreshing state... [id=subnet-0180e4a5547ff7bf4][0m
+[0m[1mmodule.vpc.aws_subnet.private[0]: Refreshing state... [id=subnet-06e004ab5a5b949ad][0m
+[0m[1mmodule.alb.aws_lb_target_group.orchestrator: Refreshing state... [id=arn:aws:elasticloadbalancing:us-east-1:837801696495:targetgroup/ghost-engine-orch-tg-dev/3afd5d1b9dea4d55][0m
+[0m[1mmodule.ecs.aws_service_discovery_private_dns_namespace.internal: Refreshing state... [id=ns-fnsnzzcntg7o4g2k][0m
+[0m[1mmodule.alb.aws_security_group.alb: Refreshing state... [id=sg-0f998e698871a9a54][0m
+[0m[1mmodule.vpc.aws_route_table.public: Refreshing state... [id=rtb-04a02bc29fc142dfe][0m
+[0m[1mmodule.s3_artifacts.aws_s3_bucket_public_access_block.artifacts: Refreshing state... [id=ghost-engine-artifacts-dev][0m
+[0m[1mmodule.ecs.aws_iam_role_policy.task_role_policy: Refreshing state... [id=ghost-engine-task-role-dev:ghost-engine-task-policy-dev][0m
+[0m[1mmodule.s3_artifacts.aws_s3_bucket_lifecycle_configuration.artifacts: Refreshing state... [id=ghost-engine-artifacts-dev][0m
+[0m[1mmodule.ecs.aws_ecs_task_definition.worker: Refreshing state... [id=ghost-engine-worker-dev][0m
+[0m[1mmodule.ecs.aws_ecs_task_definition.orchestrator: Refreshing state... [id=ghost-engine-orchestrator-dev][0m
+[0m[1mmodule.vpc.aws_nat_gateway.main: Refreshing state... [id=nat-0a481ceca67acd231][0m
+[0m[1mmodule.ecs.aws_security_group.orchestrator: Refreshing state... [id=sg-07312eac75696dddc][0m
+[0m[1mmodule.alb.aws_lb.main: Refreshing state... [id=arn:aws:elasticloadbalancing:us-east-1:837801696495:loadbalancer/app/ghost-engine-alb-dev/57cbec1244592bc6][0m
+[0m[1mmodule.vpc.aws_route_table_association.public[0]: Refreshing state... [id=rtbassoc-0a13f6759b24c092e][0m
+[0m[1mmodule.vpc.aws_route_table_association.public[1]: Refreshing state... [id=rtbassoc-0019f057dfc2bbf4e][0m
+[0m[1mmodule.vpc.aws_route_table.private: Refreshing state... [id=rtb-01eda6c4fa0687934][0m
+[0m[1mmodule.ecs.aws_security_group.worker: Refreshing state... [id=sg-0f9fbaeba0628121b][0m
+[0m[1mmodule.ecs.aws_ecs_service.orchestrator: Refreshing state... [id=arn:aws:ecs:us-east-1:837801696495:service/ghost-engine-cluster-dev/orchestrator][0m
+[0m[1mmodule.vpc.aws_route_table_association.private[0]: Refreshing state... [id=rtbassoc-06844b59001f5710f][0m
+[0m[1mmodule.vpc.aws_route_table_association.private[1]: Refreshing state... [id=rtbassoc-00690e075c791455d][0m
+[0m[1mmodule.ecs.aws_security_group_rule.worker_to_orchestrator: Refreshing state... [id=sgrule-2942040838][0m
+[0m[1mmodule.ecs.aws_ecs_service.worker: Refreshing state... [id=arn:aws:ecs:us-east-1:837801696495:service/ghost-engine-cluster-dev/worker][0m
+[0m[1mmodule.dashboard.aws_cloudwatch_dashboard.main: Refreshing state... [id=ghost-engine-dashboard-dev][0m
+[0m[1mmodule.alb.aws_lb_listener.http: Refreshing state... [id=arn:aws:elasticloadbalancing:us-east-1:837801696495:listener/app/ghost-engine-alb-dev/57cbec1244592bc6/625f34dec27dd761][0m
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  [33m~[0m update in-place[0m
+
+Terraform will perform the following actions:
+
+[1m  # module.ecs.aws_security_group.orchestrator[0m will be updated in-place
+[0m  [33m~[0m[0m resource "aws_security_group" "orchestrator" {
+        id                     = "sg-07312eac75696dddc"
+      [33m~[0m[0m ingress                = [
+          [31m-[0m[0m {
+              [31m-[0m[0m cidr_blocks      = []
+              [31m-[0m[0m from_port        = 8080
+              [31m-[0m[0m ipv6_cidr_blocks = []
+              [31m-[0m[0m prefix_list_ids  = []
+              [31m-[0m[0m protocol         = "tcp"
+              [31m-[0m[0m security_groups  = [
+                  [31m-[0m[0m "sg-0f998e698871a9a54",
+                ]
+              [31m-[0m[0m self             = false
+              [31m-[0m[0m to_port          = 8080
+                [90m# (1 unchanged attribute hidden)[0m[0m
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cidr_blocks      = []
+              [31m-[0m[0m from_port        = 8080
+              [31m-[0m[0m ipv6_cidr_blocks = []
+              [31m-[0m[0m prefix_list_ids  = []
+              [31m-[0m[0m protocol         = "tcp"
+              [31m-[0m[0m security_groups  = [
+                  [31m-[0m[0m "sg-0f9fbaeba0628121b",
+                ]
+              [31m-[0m[0m self             = false
+              [31m-[0m[0m to_port          = 8080
+                [90m# (1 unchanged attribute hidden)[0m[0m
+            },
+          [32m+[0m[0m {
+              [32m+[0m[0m cidr_blocks      = []
+              [32m+[0m[0m from_port        = 8080
+              [32m+[0m[0m ipv6_cidr_blocks = []
+              [32m+[0m[0m prefix_list_ids  = []
+              [32m+[0m[0m protocol         = "tcp"
+              [32m+[0m[0m security_groups  = [
+                  [32m+[0m[0m "sg-0f998e698871a9a54",
+                ]
+              [32m+[0m[0m self             = false
+              [32m+[0m[0m to_port          = 8080
+            },
+        ]
+        name                   = "ghost-engine-orch-sg-dev"
+        tags                   = {}
+        [90m# (9 unchanged attributes hidden)[0m[0m
+    }
+
+[1mPlan:[0m [0m0 to add, 1 to change, 0 to destroy.
+[90m
+─────────────────────────────────────────────────────────────────────────────[0m
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.

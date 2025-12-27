@@ -30,3 +30,7 @@ output "aws_region" {
   value = var.aws_region
 }
 
+output "cloudfront_domain" {
+  value = module.cloudfront.domain_name
+}
+

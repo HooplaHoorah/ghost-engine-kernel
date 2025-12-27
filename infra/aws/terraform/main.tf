@@ -78,3 +78,10 @@ module "dashboard" {
   orchestrator_service_name = module.ecs.orchestrator_service_name
   worker_service_name       = module.ecs.worker_service_name
 }
+
+module "cloudfront" {
+  source       = "./modules/cloudfront"
+  project_name = var.project_name
+  env          = var.env
+  alb_dns_name = module.alb.dns_name
+}
