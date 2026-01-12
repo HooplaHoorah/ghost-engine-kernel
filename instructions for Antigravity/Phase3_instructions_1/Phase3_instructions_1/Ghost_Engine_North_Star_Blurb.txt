@@ -1,0 +1,15 @@
+If Ghost Engine OSS = “open orchestration + determinism + provenance + eval + adapters”: shelf life is multi-year, because even if generators add “interaction,” teams still need:
+
+reproducibility across vendors/versions
+
+caching/cost controls
+
+audit/provenance
+
+portability across engines
+
+regression/eval harnesses (“did the new model break collision? nav? gameplay metrics?”)
+
+That second framing is how you make “moving target AI” work for you: every new model/API becomes “just another adapter,” and your kernel becomes the stable layer.
+
+If you want, I can turn this into a 1-page CodeLaunch positioning statement (what OSS is, what GE DOOM is, and where Marble plugs in) so the repo + pitch deck stop fighting each other.

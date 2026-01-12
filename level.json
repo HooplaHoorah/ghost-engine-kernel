@@ -1,0 +1,53 @@
+{
+  "version": "0",
+  "seed": 123,
+  "units": "tile",
+  "tiles": {
+    "size": 32
+  },
+  "rooms": [
+    {
+      "id": "main-hall",
+      "x": 0,
+      "y": 0,
+      "w": 14,
+      "h": 9,
+      "theme": "default"
+    }
+  ],
+  "connections": [],
+  "entities": [
+    {
+      "id": "enemy-0",
+      "type": "enemy",
+      "roomId": "main-hall",
+      "x": 4,
+      "y": 4
+    },
+    {
+      "id": "enemy-1",
+      "type": "enemy",
+      "roomId": "main-hall",
+      "x": 11,
+      "y": 7
+    },
+    {
+      "id": "key-1",
+      "type": "key",
+      "roomId": "main-hall",
+      "x": 12,
+      "y": 6
+    }
+  ],
+  "spawn": {
+    "roomId": "main-hall",
+    "x": 1,
+    "y": 1
+  },
+  "exit": {
+    "roomId": "main-hall",
+    "x": 12,
+    "y": 7
+  },
+  "prompt": "CLI Play"
+}

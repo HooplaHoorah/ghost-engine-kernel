@@ -1,0 +1,26 @@
+{
+  "name": "ghost-engine",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "protocol",
+    "kernel",
+    "adapters/*",
+    "runtimes/*",
+    "cli",
+    "exporters/*",
+    "services/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean",
+    "fmt": "pnpm -r fmt",
+    "demo": "node cli/dist/index.js play"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

@@ -2,8 +2,6 @@
 **/dist
 **/.turbo
 **/.cache
-node_modules/
-**/node_modules
 
 # local env
 **/.env
@@ -15,6 +13,3 @@ Thumbs.db
 
 # runtime artifacts
 *.log
-
-# reports
-walkthrough reports/

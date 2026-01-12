@@ -1,0 +1,8 @@
+packages:
+  - 'protocol'
+  - 'kernel'
+  - 'adapters/*'
+  - 'runtimes/*'
+  - 'cli'
+  - 'exporters/*'
+  - 'services/*'
